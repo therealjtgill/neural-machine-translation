@@ -28,12 +28,10 @@ class DecoderCell(RNNCell):
     self._gru_size = gru_size
     self._in_seq_length = tf.cast(tf.shape(encoder_output)[0], tf.int32)
     # The embedded output from the decoder and the attention vector are snuck in with the actual decoder state.
-    #self._state_size = (self._input_size//2, output_embedding_size, self._in_seq_length)
     self._state_size = (self._gru_size, output_embedding_size, self._in_seq_length)
     self._output_embedding_size = output_embedding_size
     self._output_vocab_size = output_vocab_size
-    # This thing needs to be dragged around to calculate attention at each call of
-    # the decoder.
+    self._output_size = (self._output_vocab_size, self._in_seq_length)
     # Shape = [batch_size, in_seq_length, input_size]
     self._encoder_output = encoder_output
 
@@ -76,9 +74,11 @@ class DecoderCell(RNNCell):
   @property
   def output_size(self):
     '''
-    The softmax/one-hot transformation is provided as the decoder.
+    The softmax/one-hot transformation and the attention output for each intermediate
+    state is provided as the decoder's output.
     '''
-    return self._output_vocab_size
+    #return self._output_vocab_size
+    return self._output_size
 
   def __call__(self, inputs, state, scope=None):
     '''
@@ -114,8 +114,8 @@ class DecoderCell(RNNCell):
       out_embedding_layer = gen_nn_ops.relu(math_ops.matmul(gru_out, self.F) + self.bf)
 
       out_logits = math_ops.matmul(out_embedding_layer, self.G) + self.bg
-      output = nn_ops.softmax(out_logits)
-      out_embedded = math_ops.matmul(output, self.E)
+      output = (nn_ops.softmax(out_logits), alpha)
+      out_embedded = math_ops.matmul(output[0], self.E)
 
       state_out = (gru_state, out_embedded, alpha)
       print("gru state: ", gru_state)
