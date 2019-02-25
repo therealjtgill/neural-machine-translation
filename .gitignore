@@ -1,3 +1,4 @@
 raw_data/*
 tokenized_data/*
 tools
+__pycache__
