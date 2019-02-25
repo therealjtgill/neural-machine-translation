@@ -57,7 +57,7 @@ class NMT(object):
                                         dtype=tf.float32)
 
       gru_encoder_states = tf.concat(gru_encoder_out, axis=-1)
-      self.gru_dec = DecoderCell(num_encoder_nodes*2, num_decoder_nodes, gru_encoder_states)
+      self.gru_dec = DecoderCell(num_encoder_nodes*2, num_decoder_nodes, gru_encoder_states, output_vocab_size=out_vocab_size)
 
       # The decoder output for a single timestep is a tuple of:
       #   (softmax over target vocabulary, attention to input)
@@ -65,9 +65,12 @@ class NMT(object):
         tf.nn.dynamic_rnn(self.gru_dec, embedded_input_3d, dtype=tf.float32)
 
       print("gru decoder out: ", gru_decoder_out)
-      target_logits = gru_decoder_out[0]
+      predicted_logits = gru_decoder_out[0]
 
-      self.loss = tf.nn.softmax_cross_entropy_with_logits_v2()
+      target_probs_flat     = tf.reshape(self.input_data_ph, shape=[-1, out_vocab_size])
+      predicted_logits_flat = tf.reshape(predicted_logits, shape=[-1, out_vocab_size])
+
+      self.loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=target_probs_flat, logits=predicted_logits_flat)
 
 if __name__ == "__main__":
   n = NMT()
