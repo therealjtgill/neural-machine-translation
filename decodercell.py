@@ -28,10 +28,11 @@ class DecoderCell(RNNCell):
     self._gru_size = gru_size
     self._in_seq_length = tf.cast(tf.shape(encoder_output)[0], tf.int32)
     # The embedded output from the decoder and the attention vector are snuck in with the actual decoder state.
-    self._state_size = (self._gru_size, output_embedding_size, self._in_seq_length)
     self._output_embedding_size = output_embedding_size
     self._output_vocab_size = output_vocab_size
     self._output_size = (self._output_vocab_size, self._in_seq_length)
+    #self._state_size = (self._gru_size, output_embedding_size, self._in_seq_length)
+    self._state_size = (self._gru_size, self._output_vocab_size, self._in_seq_length)
     # Shape = [batch_size, in_seq_length, input_size]
     self._encoder_output = encoder_output
 
@@ -94,7 +95,9 @@ class DecoderCell(RNNCell):
     with vs.variable_scope(scope or "decoder_cell"):
       # State smuggling
       state_true = state[0]
-      y_prev = state[1]
+      #y_prev = state[1]
+      print("state[1]: ", state[1])
+      y_prev = math_ops.matmul(nn_ops.softmax(state[1]), self.E)
       # Shape = [batch_size, in_seq_length, 512]]
       attention_d = tf.nn.tanh(tf.expand_dims(tf.matmul(state_true, self.W_a) + self.bw_a, axis=1) + self._precomputed)
       print("attention_d: ", attention_d)
@@ -113,11 +116,13 @@ class DecoderCell(RNNCell):
 
       out_embedding_layer = gen_nn_ops.relu(math_ops.matmul(gru_out, self.F) + self.bf)
 
+      # Shape = [batch_size, output_vocab_size]
       out_logits = math_ops.matmul(out_embedding_layer, self.G) + self.bg
-      output = (nn_ops.softmax(out_logits), alpha)
-      out_embedded = math_ops.matmul(output[0], self.E)
+      #output = (nn_ops.softmax(out_logits), alpha)
+      output = (out_logits, alpha)
+      #out_embedded = math_ops.matmul(output[0], self.E)
 
-      state_out = (gru_state, out_embedded, alpha)
+      state_out = (gru_state, out_logits, alpha)
       print("gru state: ", gru_state)
 
       return output, state_out

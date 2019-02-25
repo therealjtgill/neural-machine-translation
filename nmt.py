@@ -64,5 +64,10 @@ class NMT(object):
       gru_decoder_out, gru_decoder_state = \
         tf.nn.dynamic_rnn(self.gru_dec, embedded_input_3d, dtype=tf.float32)
 
+      print("gru decoder out: ", gru_decoder_out)
+      target_logits = gru_decoder_out[0]
+
+      self.loss = tf.nn.softmax_cross_entropy_with_logits_v2()
+
 if __name__ == "__main__":
   n = NMT()
