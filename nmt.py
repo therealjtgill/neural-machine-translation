@@ -7,6 +7,7 @@ import tensorflow as tf
 class NMT(object):
 
   def __init__(self,
+               session,
                in_vocab_size=30000,
                out_vocab_size=30000):
 
@@ -17,6 +18,7 @@ class NMT(object):
     with tf.variable_scope("nmt"):
       self.input_data_ph   = tf.placeholder(dtype=tf.float32, shape=[None, None, in_vocab_size])
       self.output_data_ph  = tf.placeholder(dtype=tf.float32, shape=[None, None, out_vocab_size])
+      self.session = session
 
       # Sequence lengths between the encoder and decoder can be different.
       batch_size     = tf.cast(tf.shape(self.input_data_ph)[0], tf.int32)
@@ -69,8 +71,42 @@ class NMT(object):
 
       target_probs_flat     = tf.reshape(self.input_data_ph, shape=[-1, out_vocab_size])
       predicted_logits_flat = tf.reshape(predicted_logits, shape=[-1, out_vocab_size])
+      self.predictions      = tf.nn.softmax(predicted_logits, axis=-1)
+      self.attention        = gru_decoder_out[1]
 
-      self.loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=target_probs_flat, logits=predicted_logits_flat)
+      cross_entropy_2d = tf.nn.softmax_cross_entropy_with_logits_v2(labels=target_probs_flat, logits=predicted_logits_flat)
+      cross_entropy_3d = tf.reshape(cross_entropy_2d, shape=[batch_size, seq_length_dec, -1])
+      print("cross entropy: ", cross_entropy_3d)
+      self.loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_3d, axis=1))
+      print("self loss: ", self.loss)
+
+      optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
+      #grads_and_vars = optimizer.compute_gradients(self.loss)
+      #capped_grads = [(tf.clip_by_value(grad, -10., 10.), var) for grad, var in grads_and_vars]
+
+      #self.train_op = optimizer.apply_gradients(capped_grads)
+      self.train_op = optimizer.minimize(self.loss)
+
+  def trainStep(self, X, y):
+    '''
+    Takes input and target output and performs one gradient update to the
+    network weights.
+    '''
+
+    fetches = [
+      self.loss,
+      self.predictions,
+      self.train_op
+    ]
+
+    feeds = {
+      self.input_data_ph  : X,
+      self.output_data_ph : y
+    }
+
+    loss, predictions, _ = self.session.run(fetches, feeds)
 
 if __name__ == "__main__":
-  n = NMT()
+  sess = tf.Session()
+  sess.run(tf.global_variables_initializer())
+  n = NMT(sess)
