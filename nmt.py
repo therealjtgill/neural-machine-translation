@@ -91,11 +91,14 @@ class NMT(object):
     '''
     Takes input and target output and performs one gradient update to the
     network weights.
+    shape(X) = [batch_size, in_seq_length, in_vocab_size]
+    shape(y) = [batch_size, out_seq_length, out_vocab_size]
     '''
 
     fetches = [
       self.loss,
       self.predictions,
+      self.attention,
       self.train_op
     ]
 
@@ -104,7 +107,46 @@ class NMT(object):
       self.output_data_ph : y
     }
 
-    loss, predictions, _ = self.session.run(fetches, feeds)
+    loss, predictions, attention _ = self.session.run(fetches, feeds)
+
+    return loss, predictions, attention
+
+  def testStep(self, X, y):
+    '''
+    shape(X) = [batch_size, in_seq_length, in_vocab_size]
+    shape(y) = [batch_size, out_seq_length, out_vocab_size]
+    '''
+
+    fetches = [
+      self.loss,
+      self.predictions,
+      self.attention
+    ]
+
+    feeds = {
+      self.input_data_ph  : X,
+      self.output_data_ph : y
+    }
+
+    loss, predictions, attention = self.session.run(fetches, feeds)
+
+    return loss, predictions, attention
+
+  def predict(self, X, y):
+    '''
+    shape(X) = [batch_size, in_seq_length, in_vocab_size]
+    shape(y) = [batch_size, out_seq_length, out_vocab_size]
+    '''
+
+    fetches = [
+      self.loss,
+      self.predictions,
+      self.attention
+    ]
+
+    loss, predictions, attention = self.session.run(fetches, feeds)
+
+    return loss, predictions, attention
 
 if __name__ == "__main__":
   sess = tf.Session()
