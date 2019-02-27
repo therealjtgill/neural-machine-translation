@@ -15,36 +15,58 @@ class DataHandler(object):
     The language files are sentence-aligned between the two languages. There is
     one sentence per line, file1.line(i) == file2.line(i) in translation space.
     '''
-    self.file_lang_1 = file_language_1
-    self.file_lang_2 = file_language_2
-    self.dict_lang_1 = None
-    self.dict_lang_2 = None
+    self.file_langs = (file_language_1, file_language_2)
+    self.dict_langs = [None, None]
 
     with open(dict_language_1, "r") as d1:
-      self.dict_lang_1 = json.load(d1)
+      self.dict_langs[0] = json.load(d1)
 
     with open(dict_language_2, "r") as d2:
-      self.dict_lang_2 = json.load(d2)
+      self.dict_langs[1] = json.load(d2)
 
-    self.vocab_size_1 = len(self.dict_lang_1)
-    self.vocab_size_2 = len(self.dict_lang_2)
-    print("language 1 vocab size: ", self.vocab_size_1)
-    print("language 2 vocab size: ", self.vocab_size_2)
-    self.num_lines_1 = 0
-    self.num_lines_2 = 0
+    self.vocab_sizes = (len(self.dict_langs[0]), len(self.dict_langs[1]))
 
-    self.lengths_1 = {}
-    self.lengths_2 = {}
+    print("language 1 vocab size: ", self.vocab_sizes[0])
+    print("language 2 vocab size: ", self.vocab_sizes[1])
+    self.num_file_lines = [0, 0]
 
-    self.train_data_1     = self.file_lang_1 + "_train"
-    self.test_data_1      = self.file_lang_1 + "_test"
-    self.validate_data_1  = self.file_lang_1 + "_validate"
+    self.file_lang_lengths = [{}, {}]
 
-    self.train_data_2     = self.file_lang_2 + "_train"
-    self.test_data_2      = self.file_lang_2 + "_test"
-    self.validate_data_2  = self.file_lang_2 + "_validate"
+    train_file_1     = self.file_langs[0] + "_train"
+    test_file_1      = self.file_langs[0] + "_test"
+    validate_file_1  = self.file_langs[0] + "_validate"
+
+    train_file_2     = self.file_langs[1] + "_train"
+    test_file_2      = self.file_langs[1] + "_test"
+    validate_file_2  = self.file_langs[1] + "_validate"
+
+    self.train_files = (train_file_1, train_file_2)
+    self.test_files  = (test_file_1, test_file_2)
+    self.validate_files = (validate_file_1, validate_file_2)
+
+    # The train/test/validation files are all the same size (e.g. they all have
+    # the same number of lines).
+    self.train_files_size    = 0
+    self.test_files_size     = 0
+    self.validate_files_size = 0
+
+    self.used_train_indices    = []
+    self.used_test_indices     = []
+    self.used_validate_indices = []
+
+    # The number of batches that will be loaded when a request for a single
+    # batch of data is received.
+    self._preloaded_batch_depth = 10
+
+    # Pull out several batches' worth of data at a time to avoid tons of file
+    # file opens and reads. These wll be lists of raw strings that will be
+    # tokenized while the batch is generated.
+    self.preloaded_train_data    = []
+    self.preloaded_test_data     = []
+    self.preloaded_validate_data = []
 
     self.preprocess(show_plot=True)
+
 
   def getSentenceLengths(self, filename):
     line_num = 0
@@ -58,104 +80,152 @@ class DataHandler(object):
         else:
           lengths[line_length] = [line_num,]
 
-    return lengths, line_num
+    # Line numbers start at 0, which leaves the line count off by 1.
+    return lengths, line_num + 1
+
+
+  def preprocess(self, splits=[0.7, 0.15, 0.15], show_plot=False):
+
+    for i in range(2):
+      self.file_lang_lengths[i], self.num_file_lines[i] = self.getSentenceLengths(self.file_langs[i])
+
+    print(self.num_file_lines[0], self.num_file_lines[1])
+    if self.num_file_lines[0] != self.num_file_lines[1]:
+      print("The two language files must be sentence-aligned, but they do not\
+             have the same number of lines.",
+             self.num_file_lines[0],
+             self.num_file_lines[1])
+      sys.exit(-1)
+
+    if show_plot:
+      # Plot the histogram of sentence lengths for both language files.      
+      for i in range(2):
+        plt.figure()
+        x1 = [t for t in self.file_lang_lengths[i]]
+        y1 = [len(self.file_lang_lengths[i][t]) for t in x1]
+        plt.bar(x1, y1)
+      plt.draw()
+
+    file_indices = np.arange(self.num_file_lines[1])
+    num_indices = len(file_indices)
+    np.random.shuffle(file_indices)
+
+    train_start      = 0
+    num_train        = int(splits[0]*num_indices)
+    train_indices    = file_indices[train_start:train_start + num_train]
+    self.train_files_size = num_train
+
+    test_start       = train_start + num_train
+    num_test         = int(splits[1]*num_indices)
+    test_indices     = file_indices[test_start:test_start + num_test]
+    self.test_files_size = num_test
+
+    validate_start   = test_start + num_test
+    num_validate     = num_indices - num_train - num_test
+    validate_indices = file_indices[validate_start:]
+    self.validate_files_size = num_validate
+
+    print("num train sentences: ", num_train)
+    print("num test sentences: ", num_test)
+    print("num validate sentences: ", num_validate)
+
+    # Split language files into training, test, validation sets.
+    for n in range(2):
+      with open(self.file_langs[n], "r") as f1:
+        if not os.path.exists(self.train_files[n]):
+          with open(self.train_files[n], "w") as trl1:
+            for i, line in enumerate(f1):
+              if i in train_indices:
+                trl1.write(line)
+        else:
+          if n == 0:
+            _, self.train_files_size = self.getSentenceLengths(self.train_files[n])
+
+        if not os.path.exists(self.test_files[n]):
+          f1.seek(0)
+          with open(self.test_files[n], "w") as tel1:
+            for j, line in enumerate(f1):
+              if j in test_indices:
+                tel1.write(line)
+        else:
+          if n == 0:
+            _, self.test_files_size = self.getSentenceLengths(self.test_files[n])
+
+        if not os.path.exists(self.validate_files[n]):
+          f1.seek(0)
+          with open(self.validate_files[n], "w") as val1:
+            for k, line in enumerate(f1):
+              if k in validate_indices:
+                val1.write(line)
+        else:
+          if n == 0:
+            _, self.validate_files_size = self.getSentenceLengths(self.validate_files[n])
+
+    print("num train sentences: ", self.train_files_size)
+    print("num test sentences: ", self.test_files_size)
+    print("num validate sentences: ", self.validate_files_size)
+
 
   def getTrainBatch(self, batch_size):
     return self.getBatch(batch_size, source="train")
 
-  def getBatch(self, batch_size, source="train"):
+
+  def rawTextToOneHots(self, lines, vocab):
+    '''
+    Expects lines to be an array of strings, with token characters delimited by
+    spaces. So lines[i].split(" ") provides token numbers of the words in the
+    line.
+    Expects vocab to be a dictionary of words to token numbers.
+    '''
+    max_line_length = max([len(l.split(" ")) for l in lines]) + 1
+    batch_size = len(lines)
+    vocab_size = len(vocab)
+    one_hots = np.zeros((batch_size, max_line_length, vocab_size))
+    one_hots[:, :, vocab_size - 1] = 1.0
+
+    for bs in range(batch_size):
+      line_tokens = lines[bs].strip().split(" ")
+      print("line tokens: ", lines[bs], line_tokens)
+      for sl in range(len(line_tokens)):
+        hot_index = int(line_tokens[sl])
+        one_hots[bs, sl, vocab_size - 1] = 0.0
+        one_hots[bs, sl, hot_index] = 1.0
+
+    return one_hots
+
+
+  def getBatch(self, batch_size, source):
+    batch_lines = [[], []]
+    batch = [None, None]
+    #batch_in = None
+    #batch_out = None
     if source == "train":
-      pass
-
-  def preprocess(self, splits=[0.7, 0.15, 0.15], show_plot=False):
-
-    self.lengths_1, self.num_lines_1 = self.getSentenceLengths(self.file_lang_1)
-
-    self.lengths_2, self.num_lines_2 = self.getSentenceLengths(self.file_lang_2)
-
-    print(self.num_lines_1, self.num_lines_2)      
-    if self.num_lines_1 != self.num_lines_2:
-      print("The two language files must be sentence-aligned, but they do not\
-             have the same number of lines.",
-             self.num_lines_1,
-             self.num_lines_2)
-      sys.exit(-1)
-
-    if show_plot:
-      # Plot the histogram of sentence lengths for both language files.
-      plt.figure()
-      x1 = [t for t in self.lengths_1]
-      y1 = [len(self.lengths_1[t]) for t in x1]
-      plt.bar(x1, y1)
-      plt.figure()
-      x2 = [t for t in self.lengths_2]
-      y2 = [len(self.lengths_2[t]) for t in x2]
-      plt.bar(x2, y2)
-      plt.draw()
-
-    file_indices = np.arange(self.num_lines_1)
-    num_indices = len(file_indices)
-    np.random.shuffle(file_indices)
-
-    train_start     = 0
-    num_train       = int(splits[0]*num_indices)
-    train_indices   = file_indices[train_start:train_start + num_train]
-
-    test_start      = train_start + num_train
-    num_test        = int(splits[1]*num_indices)
-    test_indices    = file_indices[test_start:test_start + num_test]
-
-    validate_start  = test_start + num_test
-    num_validate    = int(splits[2]*num_indices)
-    validate_indices    = file_indices[validate_start:]
-
-    print("num train sentences: ", len(train_indices))
-    print("num test sentences: ", len(test_indices))
-    print("num validate sentences: ", len(validate_indices))
-
-    # Split language 1 file into training, test, validation sets.
-    with open(self.file_lang_1, "r") as f1:
-      if not os.path.exists(self.train_data_1):
-        with open(self.train_data_1, "w") as trl1:
-          for i, line in enumerate(f1):
-            if i in train_indices:
-              trl1.write(line)
-
-      if not os.path.exists(self.test_data_1):
-        f1.seek(0)
-        with open(self.test_data_1, "w") as tel1:
-          for j, line in enumerate(f1):
-            if j in test_indices:
-              tel1.write(line)
-
-      if not os.path.exists(self.validate_data_1):
-        f1.seek(0)
-        with open(self.validate_data_1, "w") as val1:
-          for k, line in enumerate(f1):
-            if k in validate_indices:
-              val1.write(line)
-
-    # Split language 2 file into training, test, validation sets.
-    with open(self.file_lang_2, "r") as f2:
-      if not os.path.exists(self.train_data_2):
-        with open(self.train_data_2, "w") as trl2:
-          for i, line in enumerate(f2):
-            if i in train_indices:
-              trl2.write(line)
-
-      if not os.path.exists(self.test_data_2):
-        f2.seek(0)
-        with open(self.test_data_2, "w") as tel2:
-          for j, line in enumerate(f2):
-            if j in test_indices:
-              tel2.write(line)
-
-      if not os.path.exists(self.validate_data_2):
-        f2.seek(0)
-        with open(self.validate_data_2, "w") as val2:
-          for k, line in enumerate(f2):
-            if k in validate_indices:
-              val2.write(line)
+      all_indices = np.arange(self.train_files_size)
+      if len(self.preloaded_train_data) >= batch_size:
+        batch_lines[0]  = self.preloaded_train_data[0][0:batch_size]
+        batch_lines[1]  = self.preloaded_train_data[1][0:batch_size]
+        del self.preloaded_train_data[0][0:batch_size]
+        del self.preloaded_train_data[1][0:batch_size]
+      else:
+        num_sequences = batch_size*self._preloaded_batch_depth
+        remaining_indices = list(set(all_indices).difference(set(self.used_train_indices)))
+        #batch_indices = np.random.shuffle(remaining_indices)[0:num_sequences]
+        np.random.shuffle(remaining_indices)
+        batch_indices = remaining_indices[0:num_sequences]
+        self.used_train_indices += batch_indices
+        for i in range(2):
+          with open(self.train_files[i]) as traf:
+            for j, line in enumerate(traf):
+              #print("line in training file: ", j)
+              if len(batch_lines[i]) >= num_sequences:
+                break
+              if j in batch_indices:
+                print("index-to-be added found!")
+                print("indices remaining: ", num_sequences - len(batch_lines[i]))
+                batch_lines[i].append(line)
+        for i, bstring in enumerate(batch_lines):
+          batch[i] = self.rawTextToOneHots(bstring, self.dict_langs[i])
+      return batch
 
 def main(argv):
   parser = argparse.ArgumentParser(description="Loads tokenized language data \
@@ -200,6 +270,8 @@ def main(argv):
     sys.exit(-1)
 
   dh = DataHandler(args.language1, args.dict1, args.language2, args.dict2)
+  batch = dh.getTrainBatch(8)
+  print(batch[0].shape)
   plt.show()
 
 if __name__ == "__main__":

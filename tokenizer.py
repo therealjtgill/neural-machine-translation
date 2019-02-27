@@ -52,9 +52,7 @@ def main(args):
 
   textFile = open(args.text)
   allLines = textFile.readlines()
-  #allLines = []
-  #for i in range(1000):
-  #  allLines.append(textFile.readline().replace("\n", ""))
+
   allSentences = " ".join(allLines)
   textFile.close()
 
@@ -83,6 +81,7 @@ def main(args):
   print("Wrote the tokenized file back to the hard drive.")
 
   topKTokens["<unk>"] = int(args.topk + 1)
+  topKTokens["<end>"] = int(args.topk + 2)
   wordIndexDict = open(os.path.join(args.output, "dictionary." + args.language), "w")
   topKTokensJson = json.dump(topKTokens, wordIndexDict)
   #wordIndexDict.write(topKTokensJson)
