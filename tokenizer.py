@@ -68,7 +68,7 @@ def main(args):
 
   topKTokens = {w:v + 1 for v, w in enumerate(topKWords)}
   print("Converted the topk words into tokens.")
-  print(topKTokens)
+  #print(topKTokens)
   
   with open(os.path.join(args.output, "tokenized." + args.language), "w") as outFile:
     for line in allLines:

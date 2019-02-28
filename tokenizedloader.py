@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import argparse
+import datetime
 import json
 import matplotlib.pyplot as plt
 import numpy as np
@@ -56,14 +57,14 @@ class DataHandler(object):
 
     # The number of batches that will be loaded when a request for a single
     # batch of data is received.
-    self._preloaded_batch_depth = 10
+    self._preloaded_batch_depth = 20
 
     # Pull out several batches' worth of data at a time to avoid tons of file
     # file opens and reads. These wll be lists of raw strings that will be
     # tokenized while the batch is generated.
-    self.preloaded_train_data    = []
-    self.preloaded_test_data     = []
-    self.preloaded_validate_data = []
+    self.preloaded_train_data    = [[], []]
+    self.preloaded_test_data     = [[], []]
+    self.preloaded_validate_data = [[], []]
 
     self.preprocess(show_plot=True)
 
@@ -125,27 +126,39 @@ class DataHandler(object):
     validate_indices = file_indices[validate_start:]
     self.validate_files_size = num_validate
 
-    print("num train sentences: ", num_train)
-    print("num test sentences: ", num_test)
-    print("num validate sentences: ", num_validate)
+    print("estimated num train sentences: ", num_train)
+    print("estimated num test sentences: ", num_test)
+    print("estimated num validate sentences: ", num_validate)
+
+    # Get the list of lines numbers that should be ignored (e.g. lines in
+    # either file that are blank)
+    ignore_lines = []
+    for n in range(2):
+      with open(self.file_langs[n], "r") as f1:
+        for i, line in enumerate(f1):
+          if line.strip() == "":
+            ignore_lines.append(i)
+    ignore_lines = list(set(ignore_lines))
 
     # Split language files into training, test, validation sets.
     for n in range(2):
       with open(self.file_langs[n], "r") as f1:
         if not os.path.exists(self.train_files[n]):
           with open(self.train_files[n], "w") as trl1:
+            f1.seek(0)
             for i, line in enumerate(f1):
-              if i in train_indices:
+              if i in train_indices and i not in ignore_lines:
                 trl1.write(line)
         else:
-          if n == 0:
-            _, self.train_files_size = self.getSentenceLengths(self.train_files[n])
+          #if n == 0:
+          _, self.train_files_size = self.getSentenceLengths(self.train_files[n])
+          print(self.train_files_size)
 
         if not os.path.exists(self.test_files[n]):
           f1.seek(0)
           with open(self.test_files[n], "w") as tel1:
             for j, line in enumerate(f1):
-              if j in test_indices:
+              if j in test_indices and j not in ignore_lines:
                 tel1.write(line)
         else:
           if n == 0:
@@ -154,8 +167,9 @@ class DataHandler(object):
         if not os.path.exists(self.validate_files[n]):
           f1.seek(0)
           with open(self.validate_files[n], "w") as val1:
+            f1.seek(0)
             for k, line in enumerate(f1):
-              if k in validate_indices:
+              if k in validate_indices and k not in ignore_lines:
                 val1.write(line)
         else:
           if n == 0:
@@ -168,6 +182,14 @@ class DataHandler(object):
 
   def getTrainBatch(self, batch_size):
     return self.getBatch(batch_size, source="train")
+
+
+  def getTestBatch(self, batch_size):
+    return self.getBatch(batch_size, source="test")
+
+
+  def getValidateBatch(self, batch_size):
+    return self.getBatch(batch_size, source="validate")
 
 
   def rawTextToOneHots(self, lines, vocab):
@@ -185,7 +207,7 @@ class DataHandler(object):
 
     for bs in range(batch_size):
       line_tokens = lines[bs].strip().split(" ")
-      print("line tokens: ", lines[bs], line_tokens)
+      #print("line tokens: ", lines[bs], line_tokens)
       for sl in range(len(line_tokens)):
         hot_index = int(line_tokens[sl])
         one_hots[bs, sl, vocab_size - 1] = 0.0
@@ -200,8 +222,14 @@ class DataHandler(object):
     #batch_in = None
     #batch_out = None
     if source == "train":
+
+      if len(self.preloaded_train_data[0]) != len(self.preloaded_train_data[1]):
+        print("The two preloaded data items do not have the same number of items")
+        sys.exit(-1)
+
       all_indices = np.arange(self.train_files_size)
-      if len(self.preloaded_train_data) >= batch_size:
+      if (len(self.preloaded_train_data[0]) >= batch_size) and \
+         (len(self.preloaded_train_data[1]) >= batch_size):
         batch_lines[0]  = self.preloaded_train_data[0][0:batch_size]
         batch_lines[1]  = self.preloaded_train_data[1][0:batch_size]
         del self.preloaded_train_data[0][0:batch_size]
@@ -209,22 +237,39 @@ class DataHandler(object):
       else:
         num_sequences = batch_size*self._preloaded_batch_depth
         remaining_indices = list(set(all_indices).difference(set(self.used_train_indices)))
-        #batch_indices = np.random.shuffle(remaining_indices)[0:num_sequences]
+        print("Number of remaining indices: ", len(remaining_indices))
+        # If the number of remaining indices drops below the number of lines
+        # that must be loaded, then the used training indices is reset and we
+        # start sampling from the entire training file.
+        if len(remaining_indices) < num_sequences:
+          print("Ran through the entire training set! Resetting the used training indices.")
+          print("    This batch will have indices sampled from the entire dataset.")
+          self.used_train_indices.clear()
+
         np.random.shuffle(remaining_indices)
-        batch_indices = remaining_indices[0:num_sequences]
-        self.used_train_indices += batch_indices
+        preloaded_indices = remaining_indices[0:num_sequences]
+        self.used_train_indices += preloaded_indices
         for i in range(2):
           with open(self.train_files[i]) as traf:
             for j, line in enumerate(traf):
               #print("line in training file: ", j)
-              if len(batch_lines[i]) >= num_sequences:
+              #if len(batch_lines[i]) >= num_sequences:
+              if len(self.preloaded_train_data[i]) == num_sequences:
+                print("preloaded training data ", i, " has ", len(self.preloaded_train_data[i]), "things in it")
                 break
-              if j in batch_indices:
-                print("index-to-be added found!")
-                print("indices remaining: ", num_sequences - len(batch_lines[i]))
-                batch_lines[i].append(line)
-        for i, bstring in enumerate(batch_lines):
-          batch[i] = self.rawTextToOneHots(bstring, self.dict_langs[i])
+              if j in preloaded_indices:
+                #print("index-to-be added found!")
+                print("indices remaining: ", num_sequences - len(self.preloaded_train_data[i]), "          \r", end="")
+                self.preloaded_train_data[i].append(line)
+          print("Finished loading batch indices from file ", self.train_files[i])
+
+        batch_lines[0]  = self.preloaded_train_data[0][0:batch_size]
+        batch_lines[1]  = self.preloaded_train_data[1][0:batch_size]
+        del self.preloaded_train_data[0][0:batch_size]
+        del self.preloaded_train_data[1][0:batch_size]
+
+      for i, bstring in enumerate(batch_lines):
+        batch[i] = self.rawTextToOneHots(bstring, self.dict_langs[i])
       return batch
 
 def main(argv):
@@ -270,8 +315,17 @@ def main(argv):
     sys.exit(-1)
 
   dh = DataHandler(args.language1, args.dict1, args.language2, args.dict2)
-  batch = dh.getTrainBatch(8)
-  print(batch[0].shape)
+  draw_times = []
+  start_time = 0
+  end_time = 0
+  for i in range(21700):
+    start_time = datetime.datetime.now()
+    batch = dh.getTrainBatch(64)
+    end_time = datetime.datetime.now()
+    diff = end_time - start_time
+    draw_times.append(diff.seconds)
+    print("That batch took ", diff.seconds, " seconds to be drawn.")
+    print(batch[0].shape, batch[1].shape)
   plt.show()
 
 if __name__ == "__main__":
