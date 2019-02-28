@@ -9,13 +9,17 @@ class NMT(object):
   def __init__(self,
                session,
                in_vocab_size=30000,
-               out_vocab_size=30000):
-
+               out_vocab_size=30000,
+               save=False):
+    '''
+    Set up the computation graph.
+    '''
     embedding_size        = 640
     num_encoder_nodes     = 1024
     num_decoder_nodes     = 1024
 
     with tf.variable_scope("nmt"):
+      self.saver = None
       self.input_data_ph   = tf.placeholder(dtype=tf.float32, shape=[None, None, in_vocab_size])
       self.output_data_ph  = tf.placeholder(dtype=tf.float32, shape=[None, None, out_vocab_size])
       self.session = session
@@ -23,7 +27,7 @@ class NMT(object):
       # Sequence lengths between the encoder and decoder can be different.
       batch_size     = tf.cast(tf.shape(self.input_data_ph)[0], tf.int32)
       seq_length_enc = tf.cast(tf.shape(self.input_data_ph)[1], tf.int32)
-      seq_length_dec = tf.cast(tf.shape(self.output_data_ph)[0], tf.int32)
+      seq_length_dec = tf.cast(tf.shape(self.output_data_ph)[1], tf.int32)
 
       self.zero_states_enc  = []
       self.zero_states_dec  = []
@@ -54,8 +58,8 @@ class NMT(object):
         tf.nn.bidirectional_dynamic_rnn(self.gru_encoder_fw,
                                         self.gru_encoder_bw,
                                         embedded_input_3d,
-                                        initial_state_fw=encoder_h_fw_ph,
-                                        initial_state_bw=encoder_h_bw_ph,
+                                        #initial_state_fw=encoder_h_fw_ph,
+                                        #initial_state_bw=encoder_h_bw_ph,
                                         dtype=tf.float32)
 
       gru_encoder_states = tf.concat(gru_encoder_out, axis=-1)
@@ -87,6 +91,9 @@ class NMT(object):
       #self.train_op = optimizer.apply_gradients(capped_grads)
       self.train_op = optimizer.minimize(self.loss)
 
+      if save:
+        self.saver = tf.train.Saver(max_to_keep=20)
+
   def trainStep(self, X, y):
     '''
     Takes input and target output and performs one gradient update to the
@@ -97,7 +104,6 @@ class NMT(object):
 
     fetches = [
       self.loss,
-      self.predictions,
       self.attention,
       self.train_op
     ]
@@ -107,9 +113,9 @@ class NMT(object):
       self.output_data_ph : y
     }
 
-    loss, predictions, attention _ = self.session.run(fetches, feeds)
+    loss, attention, _ = self.session.run(fetches, feeds)
 
-    return loss, predictions, attention
+    return loss, attention
 
   def testStep(self, X, y):
     '''
@@ -132,23 +138,46 @@ class NMT(object):
 
     return loss, predictions, attention
 
-  def predict(self, X, y):
+  def predict(self, X):
     '''
     shape(X) = [batch_size, in_seq_length, in_vocab_size]
-    shape(y) = [batch_size, out_seq_length, out_vocab_size]
     '''
 
     fetches = [
-      self.loss,
       self.predictions,
       self.attention
     ]
 
-    loss, predictions, attention = self.session.run(fetches, feeds)
+    feeds = {
+      self.input_data_ph  : X
+    }
 
-    return loss, predictions, attention
+    predictions, attention = self.session.run(fetches, feeds)
+
+    return predictions, attention
+
+  def saveParams(self, save_dir, global_step):
+    '''
+    Save the model parameters.
+    '''
+    self.saver.save(self.session, save_dir, global_step=global_step)
+
+  def loadParams(self, save_dir):
+    '''
+    Load saved model parameters.
+    '''
+    self.saver.restore(self.session, save_dir)
 
 if __name__ == "__main__":
+  '''
+  Pass some fake data through the model as a water-through-pipes test.
+  '''
   sess = tf.Session()
-  sess.run(tf.global_variables_initializer())
+  input_batch = np.random.rand(20, 113, 30000)
+  output_batch = np.random.rand(20, 113, 30000)
   n = NMT(sess)
+  sess.run(tf.global_variables_initializer())
+  print(n.trainStep(input_batch, output_batch)[0])
+  print(n.testStep(input_batch, output_batch)[0])
+  input_batch = np.random.rand(22, 56, 30000)
+  print(n.predict(input_batch)[0])

@@ -17,15 +17,19 @@ class DataHandler(object):
     one sentence per line, file1.line(i) == file2.line(i) in translation space.
     '''
     self.file_langs = (file_language_1, file_language_2)
-    self.dict_langs = [None, None]
+    self.dict_word_to_token_langs = [None, None]
 
     with open(dict_language_1, "r") as d1:
-      self.dict_langs[0] = json.load(d1)
+      self.dict_word_to_token_langs[0] = json.load(d1)
 
     with open(dict_language_2, "r") as d2:
-      self.dict_langs[1] = json.load(d2)
+      self.dict_word_to_token_langs[1] = json.load(d2)
 
-    self.vocab_sizes = (len(self.dict_langs[0]), len(self.dict_langs[1]))
+    self.dict_token_to_word_langs = [{}, {}]
+    self.dict_token_to_word_langs[0] = {v: k for k, v in self.dict_word_to_token_langs[0].items()}
+    self.dict_token_to_word_langs[1] = {v: k for k, v in self.dict_word_to_token_langs[1].items()}
+
+    self.vocab_sizes = (len(self.dict_word_to_token_langs[0]), len(self.dict_word_to_token_langs[1]))
 
     print("language 1 vocab size: ", self.vocab_sizes[0])
     print("language 2 vocab size: ", self.vocab_sizes[1])
@@ -180,6 +184,39 @@ class DataHandler(object):
     print("num validate sentences: ", self.validate_files_size)
 
 
+  def tokensToWords(self, tokens, dictionary, no_unk=True):
+    '''
+    Expects an array of tokens of the form:
+    [token0, token1, token2, token3, ...]
+    where tokens are in numerical format.
+    Returns a string of words delimited by spaces.
+    '''
+    words = []
+    for token in tokens:
+      #print(token)
+      if no_unk:
+        if dictionary[token] != "<unk>":
+          words.append(dictionary[token])
+      else:
+        words.append(dictionary[token])
+
+    return " ".join(words)
+
+
+  def oneHotsToWords(self, one_hots, dictionary, no_unk=True):
+    '''
+    Expects one_hots to be a numpy array with rows of one-hot values and
+    columns that correspond to word IDs.
+    Or one_hots can also be a list of one-hot vectors.
+    '''
+    tokens = []
+    for oh in one_hots:
+      #print(np.nonzero(oh))
+      token = np.squeeze(np.nonzero(oh))
+      tokens.append(int(token))
+    return self.tokensToWords(tokens, dictionary)
+
+
   def getTrainBatch(self, batch_size):
     return self.getBatch(batch_size, source="train")
 
@@ -192,14 +229,18 @@ class DataHandler(object):
     return self.getBatch(batch_size, source="validate")
 
 
-  def rawTextToOneHots(self, lines, vocab):
+  def rawTextToOneHots(self, lines, vocab, seq_length=None):
     '''
     Expects lines to be an array of strings, with token characters delimited by
     spaces. So lines[i].split(" ") provides token numbers of the words in the
     line.
     Expects vocab to be a dictionary of words to token numbers.
     '''
-    max_line_length = max([len(l.split(" ")) for l in lines]) + 1
+    max_line_length = 0
+    if seq_length == None:
+      max_line_length = max([len(l.split(" ")) for l in lines]) + 1
+    else:
+      max_line_length = seq_length
     batch_size = len(lines)
     vocab_size = len(vocab)
     one_hots = np.zeros((batch_size, max_line_length, vocab_size))
@@ -219,8 +260,6 @@ class DataHandler(object):
   def getBatch(self, batch_size, source):
     batch_lines = [[], []]
     batch = [None, None]
-    #batch_in = None
-    #batch_out = None
     if source == "train":
 
       if len(self.preloaded_train_data[0]) != len(self.preloaded_train_data[1]):
@@ -247,20 +286,19 @@ class DataHandler(object):
           self.used_train_indices.clear()
 
         np.random.shuffle(remaining_indices)
-        preloaded_indices = remaining_indices[0:num_sequences]
+        preloaded_indices = sorted(remaining_indices[0:num_sequences])
         self.used_train_indices += preloaded_indices
         for i in range(2):
+          num_lines_loaded = 0
           with open(self.train_files[i]) as traf:
             for j, line in enumerate(traf):
-              #print("line in training file: ", j)
-              #if len(batch_lines[i]) >= num_sequences:
               if len(self.preloaded_train_data[i]) == num_sequences:
                 print("preloaded training data ", i, " has ", len(self.preloaded_train_data[i]), "things in it")
                 break
-              if j in preloaded_indices:
-                #print("index-to-be added found!")
+              if j == preloaded_indices[num_lines_loaded]:
                 print("indices remaining: ", num_sequences - len(self.preloaded_train_data[i]), "          \r", end="")
                 self.preloaded_train_data[i].append(line)
+                num_lines_loaded += 1
           print("Finished loading batch indices from file ", self.train_files[i])
 
         batch_lines[0]  = self.preloaded_train_data[0][0:batch_size]
@@ -268,9 +306,104 @@ class DataHandler(object):
         del self.preloaded_train_data[0][0:batch_size]
         del self.preloaded_train_data[1][0:batch_size]
 
-      for i, bstring in enumerate(batch_lines):
-        batch[i] = self.rawTextToOneHots(bstring, self.dict_langs[i])
-      return batch
+    elif source == "test":
+
+      if len(self.preloaded_test_data[0]) != len(self.preloaded_test_data[1]):
+        print("The two preloaded data items do not have the same number of items")
+        sys.exit(-1)
+
+      all_indices = np.arange(self.test_files_size)
+      if (len(self.preloaded_test_data[0]) >= batch_size) and \
+         (len(self.preloaded_test_data[1]) >= batch_size):
+        batch_lines[0]  = self.preloaded_test_data[0][0:batch_size]
+        batch_lines[1]  = self.preloaded_test_data[1][0:batch_size]
+        del self.preloaded_test_data[0][0:batch_size]
+        del self.preloaded_test_data[1][0:batch_size]
+      else:
+        num_sequences = batch_size*self._preloaded_batch_depth
+        remaining_indices = list(set(all_indices).difference(set(self.used_test_indices)))
+        print("Number of remaining indices: ", len(remaining_indices))
+        # If the number of remaining indices drops below the number of lines
+        # that must be loaded, then the used testing indices is reset and we
+        # start sampling from the entire testing file.
+        if len(remaining_indices) < num_sequences:
+          print("Ran through the entire testing set! Resetting the used testing indices.")
+          print("    This batch will have indices sampled from the entire dataset.")
+          self.used_test_indices.clear()
+
+        np.random.shuffle(remaining_indices)
+        preloaded_indices = sorted(remaining_indices[0:num_sequences])
+        self.used_test_indices += preloaded_indices
+        for i in range(2):
+          num_lines_loaded = 0
+          with open(self.test_files[i]) as traf:
+            for j, line in enumerate(traf):
+              if len(self.preloaded_test_data[i]) == num_sequences:
+                print("preloaded testing data ", i, " has ", len(self.preloaded_test_data[i]), "things in it")
+                break
+              if j == preloaded_indices[num_lines_loaded]:
+                print("indices remaining: ", num_sequences - len(self.preloaded_test_data[i]), "          \r", end="")
+                self.preloaded_test_data[i].append(line)
+                num_lines_loaded += 1
+          print("Finished loading batch indices from file ", self.test_files[i])
+
+        batch_lines[0]  = self.preloaded_test_data[0][0:batch_size]
+        batch_lines[1]  = self.preloaded_test_data[1][0:batch_size]
+        del self.preloaded_test_data[0][0:batch_size]
+        del self.preloaded_test_data[1][0:batch_size]
+
+    elif source == "validate":
+
+      if len(self.preloaded_validate_data[0]) != len(self.preloaded_validate_data[1]):
+        print("The two preloaded data items do not have the same number of items")
+        sys.exit(-1)
+
+      all_indices = np.arange(self.validate_files_size)
+      if (len(self.preloaded_validate_data[0]) >= batch_size) and \
+         (len(self.preloaded_validate_data[1]) >= batch_size):
+        batch_lines[0]  = self.preloaded_validate_data[0][0:batch_size]
+        batch_lines[1]  = self.preloaded_validate_data[1][0:batch_size]
+        del self.preloaded_validate_data[0][0:batch_size]
+        del self.preloaded_validate_data[1][0:batch_size]
+      else:
+        num_sequences = batch_size*self._preloaded_batch_depth
+        remaining_indices = list(set(all_indices).difference(set(self.used_validate_indices)))
+        print("Number of remaining indices: ", len(remaining_indices))
+        # If the number of remaining indices drops below the number of lines
+        # that must be loaded, then the used validating indices is reset and we
+        # start sampling from the entire validating file.
+        if len(remaining_indices) < num_sequences:
+          print("Ran through the entire validating set! Resetting the used validating indices.")
+          print("    This batch will have indices sampled from the entire dataset.")
+          self.used_validate_indices.clear()
+
+        np.random.shuffle(remaining_indices)
+        preloaded_indices = sorted(remaining_indices[0:num_sequences])
+        self.used_validate_indices += preloaded_indices
+        for i in range(2):
+          num_lines_loaded = 0
+          with open(self.validate_files[i]) as traf:
+            for j, line in enumerate(traf):
+              if len(self.preloaded_validate_data[i]) == num_sequences:
+                print("preloaded validating data ", i, " has ", len(self.preloaded_validate_data[i]), "things in it")
+                break
+              if j == preloaded_indices[num_lines_loaded]:
+                print("indices remaining: ", num_sequences - len(self.preloaded_validate_data[i]), "          \r", end="")
+                self.preloaded_validate_data[i].append(line)
+                num_lines_loaded += 1
+          print("Finished loading batch indices from file ", self.validate_files[i])
+
+        batch_lines[0]  = self.preloaded_validate_data[0][0:batch_size]
+        batch_lines[1]  = self.preloaded_validate_data[1][0:batch_size]
+        del self.preloaded_validate_data[0][0:batch_size]
+        del self.preloaded_validate_data[1][0:batch_size]
+
+    max_line_lengths = []
+    max_line_lengths.append(max([len(l.split(" ")) for l in batch_lines[0]]) + 1)
+    max_line_lengths.append(max([len(l.split(" ")) for l in batch_lines[1]]) + 1)
+    for i, bstring in enumerate(batch_lines):
+      batch[i] = self.rawTextToOneHots(bstring, self.dict_word_to_token_langs[i], max(max_line_lengths))
+    return batch
 
 def main(argv):
   parser = argparse.ArgumentParser(description="Loads tokenized language data \
@@ -296,6 +429,12 @@ def main(argv):
     help        = "The location of the dictionary that translates words to \
                    tokens in the second language.")
 
+  parser.add_argument("-n", "--numpulls",
+    required    = False,
+    default     = 5,
+    help        = "The number of batches to be pulled out of the data. \
+                   Default value is 5.")
+
   args = parser.parse_args()
 
   if not os.path.exists(args.language1):
@@ -318,15 +457,23 @@ def main(argv):
   draw_times = []
   start_time = 0
   end_time = 0
-  for i in range(21700):
+  for i in range(args.numpulls):
     start_time = datetime.datetime.now()
-    batch = dh.getTrainBatch(64)
+    batch1 = dh.getTrainBatch(64)
     end_time = datetime.datetime.now()
+    batch2 = dh.getTestBatch(64)
+    print(batch1[0].shape, batch1[1].shape)
+    print()
+    print(dh.oneHotsToWords(batch1[0][0], dh.dict_token_to_word_langs[0]))
+    print(dh.oneHotsToWords(batch1[1][0], dh.dict_token_to_word_langs[1]))
+    print()
+    print(dh.oneHotsToWords(batch2[0][0], dh.dict_token_to_word_langs[0]))
+    print(dh.oneHotsToWords(batch2[1][0], dh.dict_token_to_word_langs[1]))
     diff = end_time - start_time
     draw_times.append(diff.seconds)
     print("That batch took ", diff.seconds, " seconds to be drawn.")
-    print(batch[0].shape, batch[1].shape)
-  plt.show()
+    
+  #plt.show()
 
 if __name__ == "__main__":
   main(sys.argv)
