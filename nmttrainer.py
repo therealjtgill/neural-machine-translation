@@ -7,6 +7,7 @@ import numpy as np
 import os
 import sys
 import tensorflow as tf
+import time
 from tokenizedloader import DataHandler
 
 def saveAttention(att, save_dir, offset):
@@ -46,7 +47,7 @@ def main(argv):
   parser.add_argument("-b", "--batchsize",
     required    = False,
     #default     = 30,
-    default     = 50,
+    default     = 45,
     help        = "The size of the training batches to use.")
 
   args = parser.parse_args()
@@ -62,7 +63,9 @@ def main(argv):
 
   loss_file = open(os.path.join(save_dir, "losses.dat"), "w")
 
-  for i in range(70000):
+  start_time = time.time()
+
+  for i in range(120000):
     new_batch = dh.getTrainBatch(args.batchsize)
     while new_batch[0].shape[1] > 90:
       print("That batch was too big, getting another one.")
@@ -80,6 +83,11 @@ def main(argv):
       print("shape of predictions: ", predictions.shape)
       saveTranslation(valid_batch[0], valid_batch[1], predictions[0], save_dir, i, dh)
       saveAttention(attention[0], save_dir, i)
+      current_time = time.time()
+      hours, rem = divmod(current_time - start_time, 3600)
+      minutes, seconds = divmod(rem, 60)
+      print("Elapsed time: {:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds))
+
 
 if __name__ == "__main__":
   main(sys.argv)

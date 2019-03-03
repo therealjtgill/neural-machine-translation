@@ -66,15 +66,23 @@ class NMT(object):
                                         dtype=tf.float32)
 
       W_decoder_init = tf.Variable(tf.random_normal((num_encoder_nodes, num_encoder_nodes)))
-      decoder_initial_state = tf.nn.tanh(tf.matmul(W_decoder_init, gru_encoder_out[1][:, 0, :]))
+      print("gru encoder out: ", gru_encoder_out)
+      decoder_initial_state = tf.nn.tanh(tf.matmul(gru_encoder_out[1][:, 0, :], W_decoder_init))
+      print("decoder initial state: ", decoder_initial_state)
       gru_encoder_states = tf.concat(gru_encoder_out, axis=-1)
       self.gru_dec = DecoderCell(num_encoder_nodes*2, num_decoder_nodes, gru_encoder_states, output_vocab_size=out_vocab_size)
       self.gru_dec_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_dec, output_keep_prob=self.dropout_prob_ph)
+      decoder_zero_state = list(self.gru_dec_dropout.zero_state(batch_size, dtype=tf.float32))
+      print("decoder state: ", decoder_zero_state)
+      decoder_zero_state[0] = decoder_initial_state
+      decoder_zero_state = tuple(decoder_zero_state)
+      print("decoder state: ", decoder_zero_state)
+      print("state size decoder: ", self.gru_dec_dropout.state_size)
 
       # The decoder output for a single timestep is a tuple of:
       #   (softmax over target vocabulary, attention to input)
       gru_decoder_out, gru_decoder_state = \
-        tf.nn.dynamic_rnn(self.gru_dec_dropout, embedded_input_3d, dtype=tf.float32, initial_state=decoder_initial_state)
+        tf.nn.dynamic_rnn(self.gru_dec_dropout, embedded_input_3d, dtype=tf.float32, initial_state=decoder_zero_state)
 
       print("gru decoder out: ", gru_decoder_out)
       predicted_logits = gru_decoder_out[0]
@@ -90,8 +98,8 @@ class NMT(object):
       self.loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_3d, axis=1))
       print("self loss: ", self.loss)
 
-      #optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
-      optimizer = tf.train.AdadeltaOptimizer(learning_rate=0.0001, epsilon=1e-06)
+      optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
+      #optimizer = tf.train.AdadeltaOptimizer(learning_rate=0.001, epsilon=1e-06)
       grads_and_vars = optimizer.compute_gradients(self.loss)
       capped_grads = [(grad if grad is None else tf.clip_by_norm(grad, 1.0), var) for grad, var in grads_and_vars]
 

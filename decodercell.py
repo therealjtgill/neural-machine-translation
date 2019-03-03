@@ -4,6 +4,7 @@ import numpy as np
 from numpy.random import rand
 
 from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import gen_math_ops
 from tensorflow.python.ops import gen_nn_ops
 from tensorflow.python.ops import linalg_ops
 from tensorflow.python.ops import math_ops
@@ -48,15 +49,29 @@ class DecoderCell(RNNCell):
     self.bu_a = variables.Variable(random_ops.random_normal(shape=[512], stddev=0.001))
 
     # Used to get logits for attention mechanism.
-    self.v_a = variables.Variable(random_ops.random_normal(shape=[512], stddev=0.001))
+    self.v_a = variables.Variable(random_ops.random_normal(shape=[512], stddev=0.01))
 
-    self.E = variables.Variable(random_ops.random_normal(shape=[self._output_vocab_size, self._output_embedding_size], stddev=0.001))
+    self.E = variables.Variable(random_ops.random_normal(shape=[self._output_vocab_size, self._output_embedding_size], stddev=0.01))
 
-    self.F = variables.Variable(random_ops.random_normal(shape=[self._gru_size, self._output_embedding_size], stddev=0.001))
-    self.bf = variables.Variable(random_ops.random_normal(shape=[self._output_embedding_size], stddev=0.001))
+    self.F = variables.Variable(random_ops.random_normal(shape=[self._gru_size, self._output_embedding_size], stddev=0.01))
+    self.bf = variables.Variable(random_ops.random_normal(shape=[self._output_embedding_size], stddev=0.01))
 
-    self.G = variables.Variable(random_ops.random_normal(shape=[self._output_embedding_size, self._output_vocab_size], stddev=0.001))
-    self.bg = variables.Variable(random_ops.random_normal(shape=[self._output_vocab_size], stddev=0.001))
+    self.G = variables.Variable(random_ops.random_normal(shape=[self._output_embedding_size, self._output_vocab_size], stddev=0.01))
+    self.bg = variables.Variable(random_ops.random_normal(shape=[self._output_vocab_size], stddev=0.01))
+
+    self.U_p = variables.Variable(random_ops.random_normal(shape=[self._gru_size, 500], stddev=0.01))
+
+    self.V_p = variables.Variable(random_ops.random_normal(shape=[self._output_embedding_size, 500], stddev=0.01))
+
+    self.C_p = variables.Variable(random_ops.random_normal(shape=[2*self._gru_size, 500], stddev=0.01))
+
+    self.U_q = variables.Variable(random_ops.random_normal(shape=[self._gru_size, 500], stddev=0.01))
+
+    self.V_q = variables.Variable(random_ops.random_normal(shape=[self._output_embedding_size, 500], stddev=0.01))
+
+    self.C_q = variables.Variable(random_ops.random_normal(shape=[2*self._gru_size, 500], stddev=0.01))
+
+    self.W_o = variables.Variable(random_ops.random_normal(shape=[500, self._output_vocab_size], stddev=0.01))
 
     # Shape = [batch_size, 512]
 #    encoder_states_j = array_ops.split(self._encoder_output, num_or_size_splits=[self._in_seq_length,], axis=1)
@@ -114,14 +129,22 @@ class DecoderCell(RNNCell):
       print("state_true: ", state_true)
       gru_out, gru_state = self._gru_cell(array_ops.concat([context, y_prev], axis=-1), state_true)
 
-      out_embedding_layer = gen_nn_ops.relu(math_ops.matmul(gru_out, self.F) + self.bf)
+      #out_embedding_layer = gen_nn_ops.relu(math_ops.matmul(gru_out, self.F) + self.bf)
 
       # Shape = [batch_size, output_vocab_size]
-      out_logits = math_ops.matmul(out_embedding_layer, self.G) + self.bg
-      #output = (nn_ops.softmax(out_logits), alpha)
-      output = (out_logits, alpha)
-      #out_embedded = math_ops.matmul(output[0], self.E)
+      #out_logits = math_ops.matmul(out_embedding_layer, self.G) + self.bg
+      
+      p = math_ops.matmul(gru_out, self.U_p) + math_ops.matmul(y_prev, self.V_p) + math_ops.matmul(context, self.C_p)
+      q = math_ops.matmul(gru_out, self.U_q) + math_ops.matmul(y_prev, self.V_q) + math_ops.matmul(context, self.C_q)
 
+      print("p: ", p)
+      print("q: ", q)
+
+      t = gen_math_ops.maximum(p, q)
+      out_logits = math_ops.matmul(t, self.W_o)
+
+      output = (out_logits, alpha)
+      
       state_out = (gru_state, out_logits, alpha)
       print("gru state: ", gru_state)
 
