@@ -22,6 +22,7 @@ class NMT(object):
       self.saver = None
       self.input_data_ph   = tf.placeholder(dtype=tf.float32, shape=[None, None, in_vocab_size])
       self.output_data_ph  = tf.placeholder(dtype=tf.float32, shape=[None, None, out_vocab_size])
+      self.dropout_prob_ph = tf.placeholder(dtype=tf.float32)
       self.session = session
 
       # Sequence lengths between the encoder and decoder can be different.
@@ -53,27 +54,32 @@ class NMT(object):
       # which makes grabbing all unrolled hidden states possible.
       self.gru_encoder_fw = tf.nn.rnn_cell.GRUCell(num_encoder_nodes)
       self.gru_encoder_bw = tf.nn.rnn_cell.GRUCell(num_encoder_nodes)
+      self.gru_encoder_fw_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_encoder_fw, output_keep_prob=self.dropout_prob_ph)
+      self.gru_encoder_bw_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_encoder_bw, output_keep_prob=self.dropout_prob_ph)
 
       gru_encoder_out, gru_encoder_state = \
-        tf.nn.bidirectional_dynamic_rnn(self.gru_encoder_fw,
-                                        self.gru_encoder_bw,
+        tf.nn.bidirectional_dynamic_rnn(self.gru_encoder_fw_dropout,
+                                        self.gru_encoder_bw_dropout,
                                         embedded_input_3d,
                                         #initial_state_fw=encoder_h_fw_ph,
                                         #initial_state_bw=encoder_h_bw_ph,
                                         dtype=tf.float32)
 
+      W_decoder_init = tf.Variable(tf.random_normal((num_encoder_nodes, num_encoder_nodes)))
+      decoder_initial_state = tf.nn.tanh(tf.matmul(W_decoder_init, gru_encoder_out[1][:, 0, :]))
       gru_encoder_states = tf.concat(gru_encoder_out, axis=-1)
       self.gru_dec = DecoderCell(num_encoder_nodes*2, num_decoder_nodes, gru_encoder_states, output_vocab_size=out_vocab_size)
+      self.gru_dec_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_dec, output_keep_prob=self.dropout_prob_ph)
 
       # The decoder output for a single timestep is a tuple of:
       #   (softmax over target vocabulary, attention to input)
       gru_decoder_out, gru_decoder_state = \
-        tf.nn.dynamic_rnn(self.gru_dec, embedded_input_3d, dtype=tf.float32)
+        tf.nn.dynamic_rnn(self.gru_dec_dropout, embedded_input_3d, dtype=tf.float32, initial_state=decoder_initial_state)
 
       print("gru decoder out: ", gru_decoder_out)
       predicted_logits = gru_decoder_out[0]
 
-      target_probs_flat     = tf.reshape(self.input_data_ph, shape=[-1, out_vocab_size])
+      target_probs_flat     = tf.reshape(self.output_data_ph, shape=[-1, out_vocab_size])
       predicted_logits_flat = tf.reshape(predicted_logits, shape=[-1, out_vocab_size])
       self.predictions      = tf.nn.softmax(predicted_logits, axis=-1)
       self.attention        = gru_decoder_out[1]
@@ -84,12 +90,12 @@ class NMT(object):
       self.loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_3d, axis=1))
       print("self loss: ", self.loss)
 
-      optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
-      #grads_and_vars = optimizer.compute_gradients(self.loss)
-      #capped_grads = [(tf.clip_by_value(grad, -10., 10.), var) for grad, var in grads_and_vars]
+      #optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
+      optimizer = tf.train.AdadeltaOptimizer(learning_rate=0.0001, epsilon=1e-06)
+      grads_and_vars = optimizer.compute_gradients(self.loss)
+      capped_grads = [(grad if grad is None else tf.clip_by_norm(grad, 1.0), var) for grad, var in grads_and_vars]
 
-      #self.train_op = optimizer.apply_gradients(capped_grads)
-      self.train_op = optimizer.minimize(self.loss)
+      self.train_op = optimizer.apply_gradients(capped_grads)
 
       if save:
         self.saver = tf.train.Saver(max_to_keep=20)
@@ -109,8 +115,9 @@ class NMT(object):
     ]
 
     feeds = {
-      self.input_data_ph  : X,
-      self.output_data_ph : y
+      self.input_data_ph   : X,
+      self.output_data_ph  : y,
+      self.dropout_prob_ph : 0.8
     }
 
     loss, attention, _ = self.session.run(fetches, feeds)
@@ -130,8 +137,9 @@ class NMT(object):
     ]
 
     feeds = {
-      self.input_data_ph  : X,
-      self.output_data_ph : y
+      self.input_data_ph   : X,
+      self.output_data_ph  : y,
+      self.dropout_prob_ph : 1.0
     }
 
     loss, predictions, attention = self.session.run(fetches, feeds)
@@ -149,7 +157,8 @@ class NMT(object):
     ]
 
     feeds = {
-      self.input_data_ph  : X
+      self.input_data_ph   : X,
+      self.dropout_prob_ph : 1.0
     }
 
     predictions, attention = self.session.run(fetches, feeds)

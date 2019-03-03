@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import argparse
+import copy
 import datetime
 import json
 import matplotlib.pyplot as plt
@@ -37,13 +38,13 @@ class DataHandler(object):
 
     self.file_lang_lengths = [{}, {}]
 
-    train_file_1     = self.file_langs[0] + "_train"
-    test_file_1      = self.file_langs[0] + "_test"
-    validate_file_1  = self.file_langs[0] + "_validate"
+    train_file_1     = self.file_langs[0] + "_train_50"
+    test_file_1      = self.file_langs[0] + "_test_50"
+    validate_file_1  = self.file_langs[0] + "_validate_50"
 
-    train_file_2     = self.file_langs[1] + "_train"
-    test_file_2      = self.file_langs[1] + "_test"
-    validate_file_2  = self.file_langs[1] + "_validate"
+    train_file_2     = self.file_langs[1] + "_train_50"
+    test_file_2      = self.file_langs[1] + "_test_50"
+    validate_file_2  = self.file_langs[1] + "_validate_50"
 
     self.train_files = (train_file_1, train_file_2)
     self.test_files  = (test_file_1, test_file_2)
@@ -72,8 +73,11 @@ class DataHandler(object):
 
     self.preprocess(show_plot=True)
 
-
   def getSentenceLengths(self, filename):
+    '''
+    Grab the counts of the number of sentences with given lengths and the total
+    number of sentences in the file 'filename'.
+    '''
     line_num = 0
     lengths = {}
     with open(filename, "r") as f:
@@ -88,9 +92,11 @@ class DataHandler(object):
     # Line numbers start at 0, which leaves the line count off by 1.
     return lengths, line_num + 1
 
-
   def preprocess(self, splits=[0.7, 0.15, 0.15], show_plot=False):
-
+    '''
+    Create test, training, and validation sets. Eliminate lines from both files
+    if either file has a blank line.
+    '''
     for i in range(2):
       self.file_lang_lengths[i], self.num_file_lines[i] = self.getSentenceLengths(self.file_langs[i])
 
@@ -117,17 +123,17 @@ class DataHandler(object):
 
     train_start      = 0
     num_train        = int(splits[0]*num_indices)
-    train_indices    = file_indices[train_start:train_start + num_train]
+    train_indices    = list(file_indices[train_start:train_start + num_train])
     self.train_files_size = num_train
 
     test_start       = train_start + num_train
     num_test         = int(splits[1]*num_indices)
-    test_indices     = file_indices[test_start:test_start + num_test]
+    test_indices     = list(file_indices[test_start:test_start + num_test])
     self.test_files_size = num_test
 
     validate_start   = test_start + num_test
     num_validate     = num_indices - num_train - num_test
-    validate_indices = file_indices[validate_start:]
+    validate_indices = list(file_indices[validate_start:])
     self.validate_files_size = num_validate
 
     print("estimated num train sentences: ", num_train)
@@ -142,47 +148,90 @@ class DataHandler(object):
         for i, line in enumerate(f1):
           if line.strip() == "":
             ignore_lines.append(i)
+          if (n == 0) and len(line) > 51:
+            ignore_lines.append(i)
     ignore_lines = list(set(ignore_lines))
+
+    print("Ignoring ", len(ignore_lines), " lines of text.")
+
+#    for i, ignore_index in enumerate(ignore_lines):
+#      if ignore_index in train_indices:
+#        train_indices.pop(train_indices.index(ignore_index))
+#      if ignore_index in test_indices:
+#        test_indices.pop(test_indices.index(ignore_index))
+#      if ignore_index in validate_indices:
+#        validate_indices.pop(validate_indices.index(ignore_index))
+#      print("line", i, "out of", len(ignore_lines), "          \r", end="")
+    print("len train indices: ", len(train_indices))
+    train_indices_ = sorted(list(set(train_indices) - set(ignore_lines)))
+    test_indices_ = sorted(list(set(test_indices) - set(ignore_lines)))
+    validate_indices_ = sorted(list(set(validate_indices) - set(ignore_lines)))
+    print("len train indices: ", len(train_indices))
+
+    print("Finished restructuring the test/train/validate indices.")
 
     # Split language files into training, test, validation sets.
     for n in range(2):
       with open(self.file_langs[n], "r") as f1:
+        train_indices = copy.deepcopy(train_indices_)
         if not os.path.exists(self.train_files[n]):
           with open(self.train_files[n], "w") as trl1:
             f1.seek(0)
             for i, line in enumerate(f1):
-              if i in train_indices and i not in ignore_lines:
+              if len(train_indices) == 0:
+                break
+              #if i in train_indices and i not in ignore_lines:
+              #if i in train_indices:
+              if i == train_indices[0]:
                 trl1.write(line)
+                train_indices.pop(0)
+              print("line", i, "out of train set          \r", end="")
         else:
           #if n == 0:
           _, self.train_files_size = self.getSentenceLengths(self.train_files[n])
           print(self.train_files_size)
+        print()
 
+        test_indices = copy.deepcopy(test_indices_)
         if not os.path.exists(self.test_files[n]):
           f1.seek(0)
           with open(self.test_files[n], "w") as tel1:
             for j, line in enumerate(f1):
-              if j in test_indices and j not in ignore_lines:
+              if len(test_indices) == 0:
+                break
+              #if j in test_indices and j not in ignore_lines:
+              #if j in test_indices:
+              if j == test_indices[0]:
                 tel1.write(line)
+                test_indices.pop(0)
+              print("line", j, "out of test set          \r", end="")
         else:
           if n == 0:
             _, self.test_files_size = self.getSentenceLengths(self.test_files[n])
+        print()
 
+        validate_indices = copy.deepcopy(validate_indices_)
         if not os.path.exists(self.validate_files[n]):
           f1.seek(0)
           with open(self.validate_files[n], "w") as val1:
             f1.seek(0)
             for k, line in enumerate(f1):
-              if k in validate_indices and k not in ignore_lines:
+              if len(validate_indices) == 0:
+                break
+              #if k in validate_indices and k not in ignore_lines:
+              #if k in validate_indices:
+              if k == validate_indices[0]:
                 val1.write(line)
+                validate_indices.pop(0)
+              print("line", k, "out of validate set          \r", end="")
         else:
           if n == 0:
             _, self.validate_files_size = self.getSentenceLengths(self.validate_files[n])
+        print()
 
     print("num train sentences: ", self.train_files_size)
     print("num test sentences: ", self.test_files_size)
     print("num validate sentences: ", self.validate_files_size)
-
 
   def tokensToWords(self, tokens, dictionary, no_unk=True):
     '''
@@ -202,7 +251,6 @@ class DataHandler(object):
 
     return " ".join(words)
 
-
   def oneHotsToWords(self, one_hots, dictionary, no_unk=True):
     '''
     Expects one_hots to be a numpy array with rows of one-hot values and
@@ -212,22 +260,30 @@ class DataHandler(object):
     tokens = []
     for oh in one_hots:
       #print(np.nonzero(oh))
-      token = np.squeeze(np.nonzero(oh))
+      token = np.squeeze(oh.argmax())
       tokens.append(int(token))
     return self.tokensToWords(tokens, dictionary)
 
+  def softmaxesToWords(self, softmaxes, dictionary, no_unk=True):
+    '''
+    Expects softmaxes to be a numpy array with rows whose values are
+    normalized. This will take the argmax of each row, translate that into a
+    token, and convert the accumulated tokens to a series of words.
+    '''
+    tokens = []
+    for sm in softmaxes:
+      token = sm.argmax()
+      tokens.append(token)
+    return self.tokensToWords(tokens, dictionary)
 
   def getTrainBatch(self, batch_size):
     return self.getBatch(batch_size, source="train")
 
-
   def getTestBatch(self, batch_size):
     return self.getBatch(batch_size, source="test")
 
-
   def getValidateBatch(self, batch_size):
     return self.getBatch(batch_size, source="validate")
-
 
   def rawTextToOneHots(self, lines, vocab, seq_length=None):
     '''
@@ -256,8 +312,13 @@ class DataHandler(object):
 
     return one_hots
 
-
   def getBatch(self, batch_size, source):
+    '''
+    Return a batch of items of size 'batch_size' from the designated source.
+    This method loads multiple batches' worth of data at a time. If the size
+    of the preloaded data exceeds the size of the requested batch, then batch
+    items are pulled out of the preloaded data (saves on file read/writes).
+    '''
     batch_lines = [[], []]
     batch = [None, None]
     if source == "train":
@@ -284,6 +345,7 @@ class DataHandler(object):
           print("Ran through the entire training set! Resetting the used training indices.")
           print("    This batch will have indices sampled from the entire dataset.")
           self.used_train_indices.clear()
+          remaining_indices = list(set(all_indices).difference(set(self.used_train_indices)))
 
         np.random.shuffle(remaining_indices)
         preloaded_indices = sorted(remaining_indices[0:num_sequences])
@@ -330,6 +392,7 @@ class DataHandler(object):
           print("Ran through the entire testing set! Resetting the used testing indices.")
           print("    This batch will have indices sampled from the entire dataset.")
           self.used_test_indices.clear()
+          remaining_indices = list(set(all_indices).difference(set(self.used_test_indices)))
 
         np.random.shuffle(remaining_indices)
         preloaded_indices = sorted(remaining_indices[0:num_sequences])
@@ -376,6 +439,7 @@ class DataHandler(object):
           print("Ran through the entire validating set! Resetting the used validating indices.")
           print("    This batch will have indices sampled from the entire dataset.")
           self.used_validate_indices.clear()
+          remaining_indices = list(set(all_indices).difference(set(self.used_validate_indices)))
 
         np.random.shuffle(remaining_indices)
         preloaded_indices = sorted(remaining_indices[0:num_sequences])
@@ -432,6 +496,7 @@ def main(argv):
   parser.add_argument("-n", "--numpulls",
     required    = False,
     default     = 5,
+    type        = int,
     help        = "The number of batches to be pulled out of the data. \
                    Default value is 5.")
 
