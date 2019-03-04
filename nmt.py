@@ -48,8 +48,8 @@ class NMT(object):
 
       # Using GRUs because their outputs are the same as their hidden states,
       # which makes grabbing all unrolled hidden states possible.
-      self.gru_encoder_fw = tf.nn.rnn_cell.GRUCell(num_encoder_nodes)
-      self.gru_encoder_bw = tf.nn.rnn_cell.GRUCell(num_encoder_nodes)
+      self.gru_encoder_fw = tf.nn.rnn_cell.GRUCell(num_encoder_nodes, kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
+      self.gru_encoder_bw = tf.nn.rnn_cell.GRUCell(num_encoder_nodes, kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
       self.gru_encoder_fw_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_encoder_fw, output_keep_prob=self.dropout_prob_ph)
       self.gru_encoder_bw_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_encoder_bw, output_keep_prob=self.dropout_prob_ph)
 
@@ -92,8 +92,8 @@ class NMT(object):
       self.loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_3d, axis=1))
       print("self loss: ", self.loss)
 
-      optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
-      #optimizer = tf.train.AdadeltaOptimizer(learning_rate=0.001, epsilon=1e-06)
+      #optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
+      optimizer = tf.train.AdadeltaOptimizer(epsilon=1e-06)
       grads_and_vars = optimizer.compute_gradients(self.loss)
       capped_grads = [(grad if grad is None else tf.clip_by_norm(grad, 1.0), var) for grad, var in grads_and_vars]
 

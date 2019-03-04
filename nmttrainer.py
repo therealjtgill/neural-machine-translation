@@ -66,6 +66,7 @@ def main(argv):
   start_time = time.time()
   prev_epoch_count = dh.num_epochs_elapsed
   #for i in range(120000):
+  i = 0
   while (dh.num_epochs_elapsed < 5):
     curr_epoch_count = dh.num_epochs_elapsed
     if prev_epoch_count > curr_epoch_count:
@@ -94,7 +95,8 @@ def main(argv):
       print("Elapsed time: {:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds))
       print("Num epochs: ", curr_epoch_count)
     if (i % 500) == 0:
-      nmt.saveParams(save_dir, i)
+      nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
+    i += 1
 
 if __name__ == "__main__":
   main(sys.argv)

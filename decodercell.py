@@ -37,7 +37,7 @@ class DecoderCell(RNNCell):
     # Shape = [batch_size, in_seq_length, input_size]
     self._encoder_output = encoder_output
 
-    self._gru_cell = tf.nn.rnn_cell.GRUCell(self._gru_size)
+    self._gru_cell = tf.nn.rnn_cell.GRUCell(self._gru_size, kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
     #self._gru_cell = tf.nn.rnn_cell.GRUCell(self._output_embedding_size + self._input_size)
 
     # Will be multiplied by input state.
@@ -52,12 +52,6 @@ class DecoderCell(RNNCell):
     self.v_a = variables.Variable(random_ops.random_normal(shape=[512], stddev=0.01))
 
     self.E = variables.Variable(random_ops.random_normal(shape=[self._output_vocab_size, self._output_embedding_size], stddev=0.01))
-
-    self.F = variables.Variable(random_ops.random_normal(shape=[self._gru_size, self._output_embedding_size], stddev=0.01))
-    self.bf = variables.Variable(random_ops.random_normal(shape=[self._output_embedding_size], stddev=0.01))
-
-    self.G = variables.Variable(random_ops.random_normal(shape=[self._output_embedding_size, self._output_vocab_size], stddev=0.01))
-    self.bg = variables.Variable(random_ops.random_normal(shape=[self._output_vocab_size], stddev=0.01))
 
     self.U_p = variables.Variable(random_ops.random_normal(shape=[self._gru_size, 500], stddev=0.01))
 
@@ -129,11 +123,6 @@ class DecoderCell(RNNCell):
       print("state_true: ", state_true)
       gru_out, gru_state = self._gru_cell(array_ops.concat([context, y_prev], axis=-1), state_true)
 
-      #out_embedding_layer = gen_nn_ops.relu(math_ops.matmul(gru_out, self.F) + self.bf)
-
-      # Shape = [batch_size, output_vocab_size]
-      #out_logits = math_ops.matmul(out_embedding_layer, self.G) + self.bg
-      
       p = math_ops.matmul(gru_out, self.U_p) + math_ops.matmul(y_prev, self.V_p) + math_ops.matmul(context, self.C_p)
       q = math_ops.matmul(gru_out, self.U_q) + math_ops.matmul(y_prev, self.V_q) + math_ops.matmul(context, self.C_q)
 
