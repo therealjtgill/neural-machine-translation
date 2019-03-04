@@ -30,6 +30,8 @@ class DataHandler(object):
     self.dict_token_to_word_langs[0] = {v: k for k, v in self.dict_word_to_token_langs[0].items()}
     self.dict_token_to_word_langs[1] = {v: k for k, v in self.dict_word_to_token_langs[1].items()}
 
+    self.num_epochs_elapsed = 0
+
     self.vocab_sizes = (len(self.dict_word_to_token_langs[0]), len(self.dict_word_to_token_langs[1]))
 
     print("language 1 vocab size: ", self.vocab_sizes[0])
@@ -346,6 +348,7 @@ class DataHandler(object):
           print("    This batch will have indices sampled from the entire dataset.")
           self.used_train_indices.clear()
           remaining_indices = list(set(all_indices).difference(set(self.used_train_indices)))
+          self.num_epochs_elapsed += 1
 
         np.random.shuffle(remaining_indices)
         preloaded_indices = sorted(remaining_indices[0:num_sequences])
@@ -363,8 +366,8 @@ class DataHandler(object):
                 num_lines_loaded += 1
           print("Finished loading batch indices from file ", self.train_files[i])
 
-        batch_lines[0]  = self.preloaded_train_data[0][0:batch_size]
-        batch_lines[1]  = self.preloaded_train_data[1][0:batch_size]
+        batch_lines[0] = self.preloaded_train_data[0][0:batch_size]
+        batch_lines[1] = self.preloaded_train_data[1][0:batch_size]
         del self.preloaded_train_data[0][0:batch_size]
         del self.preloaded_train_data[1][0:batch_size]
 
@@ -410,8 +413,8 @@ class DataHandler(object):
                 num_lines_loaded += 1
           print("Finished loading batch indices from file ", self.test_files[i])
 
-        batch_lines[0]  = self.preloaded_test_data[0][0:batch_size]
-        batch_lines[1]  = self.preloaded_test_data[1][0:batch_size]
+        batch_lines[0] = self.preloaded_test_data[0][0:batch_size]
+        batch_lines[1] = self.preloaded_test_data[1][0:batch_size]
         del self.preloaded_test_data[0][0:batch_size]
         del self.preloaded_test_data[1][0:batch_size]
 
@@ -457,15 +460,23 @@ class DataHandler(object):
                 num_lines_loaded += 1
           print("Finished loading batch indices from file ", self.validate_files[i])
 
-        batch_lines[0]  = self.preloaded_validate_data[0][0:batch_size]
-        batch_lines[1]  = self.preloaded_validate_data[1][0:batch_size]
+        batch_lines[0] = self.preloaded_validate_data[0][0:batch_size]
+        batch_lines[1] = self.preloaded_validate_data[1][0:batch_size]
         del self.preloaded_validate_data[0][0:batch_size]
         del self.preloaded_validate_data[1][0:batch_size]
 
     max_line_lengths = []
     max_line_lengths.append(max([len(l.split(" ")) for l in batch_lines[0]]) + 1)
     max_line_lengths.append(max([len(l.split(" ")) for l in batch_lines[1]]) + 1)
-    for i, bstring in enumerate(batch_lines):
+    # TODO: sort the elements of batch_lines by english-sentence length.
+    batch_lengths = [(i, len(l.split(" "))) for i, l in enumerate(batch_lines[0])]
+    length_sorted_batch_indices = sorted(batch_lengths, key=(lambda s: s[1]))
+    #print("length sorted batch indices: ", length_sorted_batch_indices)
+    batch_lines_sorted = [None, None]
+    for i in range(len(batch_lines)):
+      batch_lines_sorted[i] = [batch_lines[i][j[0]] for j in length_sorted_batch_indices]
+    #for i, bstring in enumerate(batch_lines):
+    for i, bstring in enumerate(batch_lines_sorted):
       batch[i] = self.rawTextToOneHots(bstring, self.dict_word_to_token_langs[i], max(max_line_lengths))
     return batch
 

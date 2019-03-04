@@ -10,13 +10,13 @@ class NMT(object):
                session,
                in_vocab_size=30000,
                out_vocab_size=30000,
-               save=False):
+               save=True):
     '''
     Set up the computation graph.
     '''
     embedding_size        = 640
-    num_encoder_nodes     = 1024
-    num_decoder_nodes     = 1024
+    num_encoder_nodes     = 1000
+    num_decoder_nodes     = 1000
 
     with tf.variable_scope("nmt"):
       self.saver = None
@@ -32,10 +32,6 @@ class NMT(object):
 
       self.zero_states_enc  = []
       self.zero_states_dec  = []
-
-      # Placeholders for forward and backward states of encoder bidirectional GRU.
-      encoder_h_fw_ph  = tf.placeholder(dtype=tf.float32, shape=[None, num_encoder_nodes])
-      encoder_h_bw_ph  = tf.placeholder(dtype=tf.float32, shape=[None, num_encoder_nodes])
 
       # Placeholders for forward and backward states of decoder bidirectional GRU.
       decoder_h_ph = tf.placeholder(dtype=tf.float32, shape=[None, num_encoder_nodes])
@@ -58,11 +54,9 @@ class NMT(object):
       self.gru_encoder_bw_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_encoder_bw, output_keep_prob=self.dropout_prob_ph)
 
       gru_encoder_out, gru_encoder_state = \
-        tf.nn.bidirectional_dynamic_rnn(self.gru_encoder_fw_dropout,
-                                        self.gru_encoder_bw_dropout,
+        tf.nn.bidirectional_dynamic_rnn(self.gru_encoder_fw,
+                                        self.gru_encoder_bw,
                                         embedded_input_3d,
-                                        #initial_state_fw=encoder_h_fw_ph,
-                                        #initial_state_bw=encoder_h_bw_ph,
                                         dtype=tf.float32)
 
       W_decoder_init = tf.Variable(tf.random_normal((num_encoder_nodes, num_encoder_nodes)))
@@ -82,7 +76,7 @@ class NMT(object):
       # The decoder output for a single timestep is a tuple of:
       #   (softmax over target vocabulary, attention to input)
       gru_decoder_out, gru_decoder_state = \
-        tf.nn.dynamic_rnn(self.gru_dec_dropout, embedded_input_3d, dtype=tf.float32, initial_state=decoder_zero_state)
+        tf.nn.dynamic_rnn(self.gru_dec, embedded_input_3d, dtype=tf.float32, initial_state=decoder_zero_state)
 
       print("gru decoder out: ", gru_decoder_out)
       predicted_logits = gru_decoder_out[0]

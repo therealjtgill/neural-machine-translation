@@ -20,8 +20,8 @@ def saveAttention(att, save_dir, offset):
 
 def saveTranslation(batch_in, batch_out, prediction, save_dir, offset, dh):
   with open(os.path.join(save_dir, "translations_out_" + str(offset) + ".txt"), "w") as f:
-    f.write("input: " + dh.oneHotsToWords(batch_in[0], dh.dict_token_to_word_langs[0]) + "\n")
-    f.write("target: " + dh.oneHotsToWords(batch_out[0], dh.dict_token_to_word_langs[1]) + "\n")
+    f.write("input:      " + dh.oneHotsToWords(batch_in[0], dh.dict_token_to_word_langs[0]) + "\n")
+    f.write("target:     " + dh.oneHotsToWords(batch_out[0], dh.dict_token_to_word_langs[1]) + "\n")
     f.write("prediction: " + dh.softmaxesToWords(prediction, dh.dict_token_to_word_langs[1]) + "\n")
 
 def main(argv):
@@ -64,8 +64,13 @@ def main(argv):
   loss_file = open(os.path.join(save_dir, "losses.dat"), "w")
 
   start_time = time.time()
-
-  for i in range(120000):
+  prev_epoch_count = dh.num_epochs_elapsed
+  #for i in range(120000):
+  while (dh.num_epochs_elapsed < 5):
+    curr_epoch_count = dh.num_epochs_elapsed
+    if prev_epoch_count > curr_epoch_count:
+      print("\n\n\n       new epoch!        \n\n\n", curr_epoch_count)
+      prev_epoch_count = dh.num_epochs_elapsed
     new_batch = dh.getTrainBatch(args.batchsize)
     while new_batch[0].shape[1] > 90:
       print("That batch was too big, getting another one.")
@@ -87,7 +92,9 @@ def main(argv):
       hours, rem = divmod(current_time - start_time, 3600)
       minutes, seconds = divmod(rem, 60)
       print("Elapsed time: {:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds))
-
+      print("Num epochs: ", curr_epoch_count)
+    if (i % 500) == 0:
+      nmt.saveParams(save_dir, i)
 
 if __name__ == "__main__":
   main(sys.argv)
