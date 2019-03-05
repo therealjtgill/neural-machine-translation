@@ -1,5 +1,17 @@
 import json
 
+def tokensToOneHots(tokens, vocab_size):
+  '''
+  Expects an array of tokens of the form:
+  [token0, token1, token2, token3, ...]
+  The vocabulary size must be provided to ensure that the one-hot vectors have
+  the correct length.
+  '''
+  one_hots = np.zeros((len(tokens), vocab_size))
+  for i, t in enumerate(tokens):
+    one_hots[i, t] = 1.0
+  return one_hots
+
 def tokensToWords(tokens, dictionary, no_unk=True):
   '''
   Expects an array of tokens of the form:
