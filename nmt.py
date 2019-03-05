@@ -92,8 +92,8 @@ class NMT(object):
       self.loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_3d, axis=1))
       print("self loss: ", self.loss)
 
-      #optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
-      optimizer = tf.train.AdadeltaOptimizer(learning_rate=1.0, epsilon=1e-06)
+      optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
+      #optimizer = tf.train.AdadeltaOptimizer(learning_rate=1.0, epsilon=1e-06)
       grads_and_vars = optimizer.compute_gradients(self.loss)
       capped_grads = [(grad if grad is None else tf.clip_by_norm(grad, 1.0), var) for grad, var in grads_and_vars]
 

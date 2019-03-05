@@ -110,6 +110,7 @@ def main(argv):
     if (i % 500) == 0:
       nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
     i += 1
+  nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
 
 if __name__ == "__main__":
   main(sys.argv)

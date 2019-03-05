@@ -286,14 +286,14 @@ class DataHandler(object):
     k: some int
     dictionary: {token1:word1, token2:word2, ...}
     '''
-    top_k_tokens = []
+    topKTokens = []
     for sm in softmaxes:
       rearranged = [(i, p) for i, p in enumerate(sm)]
       rearranged = sorted(rearranged, key=(lambda s: s[1]))
-      top_word_k_tokens = [t[0] for t in rearranged[:k]]
-      top_k_tokens.append(tuple(top_k))
-    top_k_words = [self.tokensToWords(t, dictionary) for t in top_k_tokens]
-    return top_k_words
+      topKWordTokens = [t[0] for t in rearranged[:k]]
+      topKTokens.append(tuple(topKWordTokens))
+    topKWords = [self.tokensToWords(t, dictionary) for t in topKTokens]
+    return topKWords
 
   def getTrainBatch(self, batch_size):
     return self.getBatch(batch_size, source="train")
