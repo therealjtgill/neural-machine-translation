@@ -1,6 +1,6 @@
 import json
 
-def tokensToWords(self, tokens, dictionary, no_unk=True):
+def tokensToWords(tokens, dictionary, no_unk=True):
   '''
   Expects an array of tokens of the form:
   [token0, token1, token2, token3, ...]
@@ -18,7 +18,7 @@ def tokensToWords(self, tokens, dictionary, no_unk=True):
 
   return " ".join(words)
 
-def oneHotsToWords(self, one_hots, dictionary, no_unk=True):
+def oneHotsToWords(one_hots, dictionary, no_unk=True):
   '''
   Expects one_hots to be a numpy array with rows of one-hot values and
   columns that correspond to word IDs.
@@ -29,9 +29,9 @@ def oneHotsToWords(self, one_hots, dictionary, no_unk=True):
     #print(np.nonzero(oh))
     token = np.squeeze(oh.argmax())
     tokens.append(int(token))
-  return self.tokensToWords(tokens, dictionary, no_unk)
+  return tokensToWords(tokens, dictionary, no_unk)
 
-def softmaxesToWords(self, softmaxes, dictionary, no_unk=True):
+def softmaxesToWords(softmaxes, dictionary, no_unk=True):
   '''
   Expects softmaxes to be a numpy array with normalized rows. This will take
   the argmax of each row, translate that into a token, and convert the
@@ -41,9 +41,9 @@ def softmaxesToWords(self, softmaxes, dictionary, no_unk=True):
   for sm in softmaxes:
     token = sm.argmax()
     tokens.append(token)
-  return self.tokensToWords(tokens, dictionary)
+  return tokensToWords(tokens, dictionary)
 
-def topKPredictions(self, softmaxes, k, dictionary):
+def topKPredictions(softmaxes, k, dictionary):
   '''
   Expects softmaxes to be a numpy array with rows whose values are
   normalized.
@@ -57,5 +57,5 @@ def topKPredictions(self, softmaxes, k, dictionary):
     rearranged = sorted(rearranged, key=(lambda s: s[1]))
     top_word_k_tokens = [t[0] for t in rearranged[:k]]
     top_k_tokens.append(tuple(top_k))
-  top_k_words = [self.tokensToWords(t, dictionary) for t in top_k_tokens]
+  top_k_words = [tokensToWords(t, dictionary) for t in top_k_tokens]
   return top_k_words
