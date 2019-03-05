@@ -3,3 +3,5 @@ tokenized_data/*
 tools
 __pycache__
 *.pyc
+tokenized_data_orig/*
+.ipynb_checkpoints/*
