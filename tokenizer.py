@@ -35,6 +35,12 @@ def main(args):
     type        = int,
     required    = False)
 
+  parser.add_argument("-d", "--tokendict",
+    help        = "The dictionary containing the words-to-tokens mapping.",
+    default     = None,
+    type        = str,
+    required    = False)
+
   args = parser.parse_args()
 
   if not os.path.exists(args.text):
@@ -56,20 +62,26 @@ def main(args):
   allSentences = " ".join(allLines)
   textFile.close()
 
-  print("Opened the text file.")
-  allWords = word_tokenize(allSentences)
-  print("Loaded all sentences.")
-  wordFreqs = nltk.FreqDist(w.lower() for w in allWords)
-  print("Got all lowercase word frequencies.")
-  topKWordFreqs = wordFreqs.most_common(int(args.topk))
-  print("Got the topk words from the file.")
-  topKWords = [w[0] for w in topKWordFreqs]
-  print(topKWords[0:100])
+  topKTokens = {}
+  if args.tokendict == None:
+    print("Opened the text file.")
+    allWords = word_tokenize(allSentences)
+    print("Loaded all sentences.")
+    wordFreqs = nltk.FreqDist(w.lower() for w in allWords)
+    print("Got all lowercase word frequencies.")
+    topKWordFreqs = wordFreqs.most_common(int(args.topk))
+    print("Got the topk words from the file.")
+    topKWords = [w[0] for w in topKWordFreqs]
+    print(topKWords[0:100])
 
-  topKTokens = {w:v + 1 for v, w in enumerate(topKWords)}
-  print("Converted the topk words into tokens.")
-  #print(topKTokens)
-  
+    topKTokens = {w:v + 1 for v, w in enumerate(topKWords)}
+    print("Converted the topk words into tokens.")
+    #print(topKTokens)
+
+  else:
+    with open(args.tokendict, "r") as td:
+      topKTokens = json.load(td)
+
   with open(os.path.join(args.output, "tokenized." + args.language), "w") as outFile:
     for line in allLines:
       lineTokens = word_tokenize(line, args.language)
