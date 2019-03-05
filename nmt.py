@@ -4,13 +4,14 @@ import os
 import sys
 import tensorflow as tf
 
-class NMT(object, train=True):
+class NMT(object):
 
   def __init__(self,
                session,
                in_vocab_size=30000,
                out_vocab_size=30000,
-               save=True):
+               save=True,
+               train=True):
     '''
     Set up the computation graph.
     '''
