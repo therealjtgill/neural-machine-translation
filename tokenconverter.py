@@ -10,7 +10,10 @@ def tokensToOneHots(tokens, vocab_size):
   '''
   one_hots = np.zeros((len(tokens), vocab_size))
   for i, t in enumerate(tokens):
-    one_hots[i, t] = 1.0
+    if t == 30002:
+      one_hots[i, t-1] = 1.0
+    else:
+      one_hots[i, t] = 1.0
   return one_hots
 
 def tokensToWords(tokens, dictionary, no_unk=True):
@@ -54,7 +57,7 @@ def softmaxesToWords(softmaxes, dictionary, no_unk=True):
   for sm in softmaxes:
     token = sm.argmax()
     tokens.append(token)
-  return tokensToWords(tokens, dictionary)
+  return tokensToWords(tokens, dictionary, no_unk)
 
 def topKPredictions(softmaxes, k, dictionary):
   '''
