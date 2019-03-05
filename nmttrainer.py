@@ -80,7 +80,7 @@ def main(argv):
   prev_epoch_count = dh.num_epochs_elapsed
   #for i in range(120000):
   i = 0
-  while (dh.num_epochs_elapsed < 5):
+  while (dh.num_epochs_elapsed < args.numepochs):
     curr_epoch_count = dh.num_epochs_elapsed
     if prev_epoch_count > curr_epoch_count:
       print("\n\n\n       new epoch!        \n\n\n", curr_epoch_count)
