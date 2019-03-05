@@ -47,8 +47,19 @@ def main(argv):
   parser.add_argument("-b", "--batchsize",
     required    = False,
     #default     = 30,
-    default     = 45,
+    default     = 80,
     help        = "The size of the training batches to use.")
+
+  parser.add_argument("-n", "--numepochs",
+    required    = True,
+    type        = int,
+    help        = "The number of times to pass through the training data.")
+
+  parser.add_argument("-c", "--loadconfig",
+    required    = False,
+    default     = None,
+    help        = "The location of a configuration file to load and continue training \
+                   (e.g. some saved parameters)")
 
   args = parser.parse_args()
 
@@ -56,6 +67,8 @@ def main(argv):
   sess = tf.Session()
   nmt = NMT(sess, in_vocab_size=dh.vocab_sizes[0], out_vocab_size=dh.vocab_sizes[1])
   sess.run(tf.global_variables_initializer())
+  if args.loadconfig != None:
+    nmt.loadParams(args.loadconfig)
 
   save_dir = os.path.expanduser("~/Documents/nmt_training_output/nmt_") + str(datetime.datetime.today()).replace(":", "-").replace(" ", "-")
   if not os.path.exists(save_dir):
@@ -73,7 +86,7 @@ def main(argv):
       print("\n\n\n       new epoch!        \n\n\n", curr_epoch_count)
       prev_epoch_count = dh.num_epochs_elapsed
     new_batch = dh.getTrainBatch(args.batchsize)
-    while new_batch[0].shape[1] > 90:
+    while new_batch[0].shape[1] > 50:
       print("That batch was too big, getting another one.")
       new_batch = dh.getTrainBatch(args.batchsize)
     loss, _ = nmt.trainStep(new_batch[0], new_batch[1])
