@@ -1,4 +1,5 @@
 import json
+import numpy as np
 
 def tokensToOneHots(tokens, vocab_size):
   '''
