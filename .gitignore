@@ -5,3 +5,4 @@ __pycache__
 *.pyc
 tokenized_data_orig/*
 .ipynb_checkpoints/*
+tokenized_data_fixed/*
