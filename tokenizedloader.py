@@ -262,6 +262,8 @@ class DataHandler(object):
     tokens = []
     for oh in one_hots:
       #print(np.nonzero(oh))
+      if not np.any(oh):
+        continue
       token = np.squeeze(oh.argmax()) + 1
       tokens.append(int(token))
     return self.tokensToWords(tokens, dictionary)
@@ -309,7 +311,8 @@ class DataHandler(object):
     Expects lines to be an array of strings, with token characters delimited by
     spaces. So lines[i].split(" ") provides token numbers of the words in the
     line.
-    Expects vocab to be a dictionary of words to token numbers.
+    Expects vocab to be a dictionary of words to token numbers. It also expects
+    that the <end> tag is the last token in the dictionary (numerically).
     '''
     max_line_length = 0
     if seq_length == None:
@@ -328,6 +331,7 @@ class DataHandler(object):
         hot_index = int(line_tokens[sl]) - 1 # Tokens are 1-indexed
         one_hots[bs, sl, vocab_size - 1] = 0.0
         one_hots[bs, sl, hot_index] = 1.0
+      #one_hots[bs, len(line_tokens), vocab_size - 1] = 1.0
 
     return one_hots
 
