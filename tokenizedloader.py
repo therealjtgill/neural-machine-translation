@@ -262,7 +262,7 @@ class DataHandler(object):
     tokens = []
     for oh in one_hots:
       #print(np.nonzero(oh))
-      token = np.squeeze(oh.argmax())
+      token = np.squeeze(oh.argmax()) + 1
       tokens.append(int(token))
     return self.tokensToWords(tokens, dictionary)
 
@@ -274,7 +274,7 @@ class DataHandler(object):
     '''
     tokens = []
     for sm in softmaxes:
-      token = sm.argmax()
+      token = sm.argmax() + 1 # Softmax indices are 0-indexed, tokens are 1-indexed.
       tokens.append(token)
     return self.tokensToWords(tokens, dictionary)
 
@@ -325,7 +325,7 @@ class DataHandler(object):
       line_tokens = lines[bs].strip().split(" ")
       #print("line tokens: ", lines[bs], line_tokens)
       for sl in range(len(line_tokens)):
-        hot_index = int(line_tokens[sl])
+        hot_index = int(line_tokens[sl]) - 1 # Tokens are 1-indexed
         one_hots[bs, sl, vocab_size - 1] = 0.0
         one_hots[bs, sl, hot_index] = 1.0
 
