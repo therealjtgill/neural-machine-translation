@@ -75,6 +75,9 @@ def main(argv):
     os.makedirs(save_dir)
 
   loss_file = open(os.path.join(save_dir, "losses.dat"), "w")
+  args_file = open(os.path.join(save_dir, "args.dat"), "w")
+  json.dump(vars(args), args_file)
+  args_file.close()
 
   start_time = time.time()
   prev_epoch_count = dh.num_epochs_elapsed
@@ -111,6 +114,7 @@ def main(argv):
       nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
     i += 1
   nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
+  loss_file.close()
 
 if __name__ == "__main__":
   main(sys.argv)

@@ -132,9 +132,9 @@ class DecoderCell(RNNCell):
       t = gen_math_ops.maximum(p, q)
       out_logits = math_ops.matmul(t, self.W_o)
 
-      output = (out_logits, alpha)
+      output = (out_logits + 3., alpha)
       
-      state_out = (gru_state, out_logits, alpha)
+      state_out = (gru_state, out_logits + 3., alpha)
       print("gru state: ", gru_state)
 
       return output, state_out
