@@ -39,17 +39,17 @@ class DecoderCell(RNNCell):
 
     self._gru_cell = tf.nn.rnn_cell.GRUCell(self._gru_size, kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
     #self._gru_cell = tf.nn.rnn_cell.GRUCell(self._output_embedding_size + self._input_size)
-
+    attention_size = 1024
     # Will be multiplied by input state.
-    self.W_a = variables.Variable(random_ops.random_normal(shape=[self._gru_size, 512], stddev=0.001))
-    self.bw_a = variables.Variable(random_ops.random_normal(shape=[512], stddev=0.001))
+    self.W_a = variables.Variable(random_ops.random_normal(shape=[self._gru_size, attention_size], stddev=0.001))
+    self.bw_a = variables.Variable(random_ops.random_normal(shape=[attention_size], stddev=0.001))
 
     # Will be multiplied by hidden state from encoder.
-    self.U_a = variables.Variable(random_ops.random_normal(shape=[self._input_size, 512], stddev=0.001))
-    self.bu_a = variables.Variable(random_ops.random_normal(shape=[512], stddev=0.001))
+    self.U_a = variables.Variable(random_ops.random_normal(shape=[self._input_size, attention_size], stddev=0.001))
+    self.bu_a = variables.Variable(random_ops.random_normal(shape=[attention_size], stddev=0.001))
 
     # Used to get logits for attention mechanism.
-    self.v_a = variables.Variable(random_ops.random_normal(shape=[512], stddev=0.01))
+    self.v_a = variables.Variable(random_ops.random_normal(shape=[attention_size], stddev=0.01))
 
     self.E = variables.Variable(random_ops.random_normal(shape=[self._output_vocab_size, self._output_embedding_size], stddev=0.01))
 

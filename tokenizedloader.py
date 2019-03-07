@@ -381,7 +381,7 @@ class DataHandler(object):
               if len(self.preloaded_train_data[i]) == num_sequences:
                 print("preloaded training data ", i, " has ", len(self.preloaded_train_data[i]), "things in it")
                 break
-              if j == preloaded_indices[num_lines_loaded]:
+              if j == preloaded_indices[num_lines_loaded] and (len(line.split(" ")) > 0):
                 print("indices remaining: ", num_sequences - len(self.preloaded_train_data[i]), "          \r", end="")
                 self.preloaded_train_data[i].append(line)
                 num_lines_loaded += 1
@@ -428,7 +428,7 @@ class DataHandler(object):
               if len(self.preloaded_test_data[i]) == num_sequences:
                 print("preloaded testing data ", i, " has ", len(self.preloaded_test_data[i]), "things in it")
                 break
-              if j == preloaded_indices[num_lines_loaded]:
+              if j == preloaded_indices[num_lines_loaded] and (len(line.split(" ")) > 0):
                 print("indices remaining: ", num_sequences - len(self.preloaded_test_data[i]), "          \r", end="")
                 self.preloaded_test_data[i].append(line)
                 num_lines_loaded += 1
@@ -475,7 +475,7 @@ class DataHandler(object):
               if len(self.preloaded_validate_data[i]) == num_sequences:
                 print("preloaded validating data ", i, " has ", len(self.preloaded_validate_data[i]), "things in it")
                 break
-              if j == preloaded_indices[num_lines_loaded]:
+              if j == preloaded_indices[num_lines_loaded] and (len(line.split(" ")) > 0):
                 print("indices remaining: ", num_sequences - len(self.preloaded_validate_data[i]), "          \r", end="")
                 self.preloaded_validate_data[i].append(line)
                 num_lines_loaded += 1
