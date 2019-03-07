@@ -278,7 +278,7 @@ class DataHandler(object):
     for sm in softmaxes:
       token = sm.argmax() + 1 # Softmax indices are 0-indexed, tokens are 1-indexed.
       tokens.append(token)
-    return self.tokensToWords(tokens, dictionary)
+    return self.tokensToWords(tokens, dictionary, no_unk=no_unk)
 
   def topKPredictions(self, softmaxes, k, dictionary):
     '''
@@ -289,13 +289,16 @@ class DataHandler(object):
     dictionary: {token1:word1, token2:word2, ...}
     '''
     topKTokens = []
+    topKProbs = []
     for sm in softmaxes:
       rearranged = [(i, p) for i, p in enumerate(sm)]
       rearranged = sorted(rearranged, key=(lambda s: s[1]))
       topKWordTokens = [t[0] for t in rearranged[:k]]
+      topKProbs = [t[1] for t in rearranged[:k]]
       topKTokens.append(tuple(topKWordTokens))
     topKWords = [self.tokensToWords(t, dictionary) for t in topKTokens]
-    return topKWords
+    topKItems = [(w, p) for w, p in zip(topKWords, topKProbs)]
+    return topKItems
 
   def getTrainBatch(self, batch_size):
     return self.getBatch(batch_size, source="train")

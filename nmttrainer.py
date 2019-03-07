@@ -10,19 +10,20 @@ import tensorflow as tf
 import time
 from tokenizedloader import DataHandler
 
-def saveAttention(att, save_dir, offset):
-  np.savetxt(os.path.join(save_dir, "attention" + str(offset) + ".dat"), att, fmt="%f")
+def saveAttention(att, save_dir, offset, suffix=""):
+  np.savetxt(os.path.join(save_dir, "attention" + str(offset) + suffix + ".dat"), att, fmt="%f")
   plt.figure()
   plt.title("Attention at Offset " + str(offset))
   plt.imshow(att, interpolation="none", vmin=0., vmax=1., cmap="gray")
   plt.savefig(os.path.join(save_dir, "attention" + str(offset) + ".png"), dpi=600)
   plt.close()
 
-def saveTranslation(batch_in, batch_out, prediction, save_dir, offset, dh):
-  with open(os.path.join(save_dir, "translations_out_" + str(offset) + ".txt"), "w") as f:
+def saveTranslation(batch_in, batch_out, prediction, save_dir, offset, suffix, dh):
+  with open(os.path.join(save_dir, "translations_out_" + str(offset) + suffix + ".txt"), "w") as f:
     f.write("input:      " + dh.oneHotsToWords(batch_in[0], dh.dict_token_to_word_langs[0]) + "\n")
     f.write("target:     " + dh.oneHotsToWords(batch_out[0], dh.dict_token_to_word_langs[1]) + "\n")
-    f.write("prediction: " + dh.softmaxesToWords(prediction, dh.dict_token_to_word_langs[1]) + "\n")
+    f.write("prediction: " + dh.softmaxesToWords(prediction, dh.dict_token_to_word_langs[1], no_unk=False) + "\n")
+    f.write("top 5:      " + str(dh.topKPredictions(prediction, 5, dh.dict_token_to_word_lands[1], no_unk=False)) + "\n")
 
 def main(argv):
   parser = argparse.ArgumentParser(description="Script to train a Neural Machine Translation Model.\
@@ -100,6 +101,9 @@ def main(argv):
     print("train on, mothafucka")
     loss_file.write(str(loss) + "\n")
     if (i % 50) == 0:
+      predictions, attention = nmt.predict(new_batch[0])
+      saveTranslation(new_batch[0], new_batch[1], predictions[0], save_dir, i, "_train", dh)
+      saveAttention(attention[0], save_dir, i, suffix="_train")
       valid_batch = dh.getValidateBatch(1)
       predictions, attention = nmt.predict(valid_batch[0])
       print("shape of predictions: ", predictions.shape)
