@@ -11,11 +11,11 @@ import time
 from tokenizedloader import DataHandler
 
 def saveAttention(att, save_dir, offset, suffix=""):
-  np.savetxt(os.path.join(save_dir, "attention" + str(offset) + suffix + ".dat"), att, fmt="%f")
+  #np.savetxt(os.path.join(save_dir, "attention" + str(offset) + suffix + ".dat"), att, fmt="%f")
   plt.figure()
   plt.title("Attention at Offset " + str(offset))
   plt.imshow(att, interpolation="none", vmin=0., vmax=1., cmap="gray")
-  plt.savefig(os.path.join(save_dir, "attention" + str(offset) + ".png"), dpi=600)
+  plt.savefig(os.path.join(save_dir, "attention" + str(offset) + suffix + ".png"), dpi=600)
   plt.close()
 
 def saveTranslation(batch_in, batch_out, prediction, save_dir, offset, suffix, dh):

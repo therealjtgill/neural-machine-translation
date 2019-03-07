@@ -292,9 +292,9 @@ class DataHandler(object):
     topKProbs = []
     for sm in softmaxes:
       rearranged = [(i, p) for i, p in enumerate(sm)]
-      rearranged = sorted(rearranged, key=(lambda s: s[1]))
-      topKWordTokens = [t[0] for t in rearranged[:k]]
-      topKProbs = [t[1] for t in rearranged[:k]]
+      rearranged = sorted(rearranged, key=(lambda s: s[1]))[::-1]
+      topKWordTokens = [t[0] + 1 for t in rearranged[:k]]
+      topKProbs.append(tuple([t[1] for t in rearranged[:k]]))
       topKTokens.append(tuple(topKWordTokens))
     topKWords = [self.tokensToWords(t, dictionary, no_unk=False) for t in topKTokens]
     topKItems = [(w, p) for w, p in zip(topKWords, topKProbs)]
