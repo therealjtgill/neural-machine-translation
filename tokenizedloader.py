@@ -296,7 +296,7 @@ class DataHandler(object):
       topKWordTokens = [t[0] for t in rearranged[:k]]
       topKProbs = [t[1] for t in rearranged[:k]]
       topKTokens.append(tuple(topKWordTokens))
-    topKWords = [self.tokensToWords(t, dictionary) for t in topKTokens]
+    topKWords = [self.tokensToWords(t, dictionary, no_unk=False) for t in topKTokens]
     topKItems = [(w, p) for w, p in zip(topKWords, topKProbs)]
     return topKItems
 

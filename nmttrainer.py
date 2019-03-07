@@ -23,7 +23,7 @@ def saveTranslation(batch_in, batch_out, prediction, save_dir, offset, suffix, d
     f.write("input:      " + dh.oneHotsToWords(batch_in[0], dh.dict_token_to_word_langs[0]) + "\n")
     f.write("target:     " + dh.oneHotsToWords(batch_out[0], dh.dict_token_to_word_langs[1]) + "\n")
     f.write("prediction: " + dh.softmaxesToWords(prediction, dh.dict_token_to_word_langs[1], no_unk=False) + "\n")
-    f.write("top 5:      " + str(dh.topKPredictions(prediction, 5, dh.dict_token_to_word_lands[1], no_unk=False)) + "\n")
+    f.write("top 5:      " + str(dh.topKPredictions(prediction, 5, dh.dict_token_to_word_langs[1])) + "\n")
 
 def main(argv):
   parser = argparse.ArgumentParser(description="Script to train a Neural Machine Translation Model.\
@@ -107,7 +107,7 @@ def main(argv):
       valid_batch = dh.getValidateBatch(1)
       predictions, attention = nmt.predict(valid_batch[0])
       print("shape of predictions: ", predictions.shape)
-      saveTranslation(valid_batch[0], valid_batch[1], predictions[0], save_dir, i, dh)
+      saveTranslation(valid_batch[0], valid_batch[1], predictions[0], save_dir, i, "", dh)
       saveAttention(attention[0], save_dir, i)
       current_time = time.time()
       hours, rem = divmod(current_time - start_time, 3600)
