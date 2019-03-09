@@ -23,7 +23,6 @@ class NMT(object):
       self.saver = None
       self.input_data_ph   = tf.placeholder(dtype=tf.float32, shape=[None, None, in_vocab_size])
       self.output_data_ph  = tf.placeholder(dtype=tf.float32, shape=[None, None, out_vocab_size])
-      self.dropout_prob_ph = tf.placeholder(dtype=tf.float32)
       self.session = session
 
       # Sequence lengths between the encoder and decoder can be different.
@@ -51,8 +50,6 @@ class NMT(object):
       # which makes grabbing all unrolled hidden states possible.
       self.gru_encoder_fw = tf.nn.rnn_cell.GRUCell(num_encoder_nodes, kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
       self.gru_encoder_bw = tf.nn.rnn_cell.GRUCell(num_encoder_nodes, kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
-      self.gru_encoder_fw_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_encoder_fw, output_keep_prob=self.dropout_prob_ph)
-      self.gru_encoder_bw_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_encoder_bw, output_keep_prob=self.dropout_prob_ph)
 
       self.gru_encoder_out, self.gru_encoder_state = \
         tf.nn.bidirectional_dynamic_rnn(self.gru_encoder_fw,
@@ -61,25 +58,20 @@ class NMT(object):
                                         dtype=tf.float32)
 
       W_decoder_init = tf.Variable(tf.random_normal((num_encoder_nodes, num_encoder_nodes)))
-      print("gru encoder out: ", self.gru_encoder_out)
       decoder_initial_state = tf.nn.tanh(tf.matmul(self.gru_encoder_out[1][:, 0, :], W_decoder_init))
-      print("decoder initial state: ", decoder_initial_state)
       gru_encoder_states = tf.concat(self.gru_encoder_out, axis=-1)
+
       self.gru_dec = DecoderCell(num_encoder_nodes*2, num_decoder_nodes, gru_encoder_states, output_vocab_size=out_vocab_size)
-      self.gru_dec_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_dec, output_keep_prob=self.dropout_prob_ph)
+
       decoder_zero_state = list(self.gru_dec_dropout.zero_state(batch_size, dtype=tf.float32))
-      print("decoder state: ", decoder_zero_state)
       decoder_zero_state[0] = decoder_initial_state
       decoder_zero_state = tuple(decoder_zero_state)
-      print("decoder state: ", decoder_zero_state)
-      print("state size decoder: ", self.gru_dec_dropout.state_size)
 
       # The decoder output for a single timestep is a tuple of:
       #   (softmax over target vocabulary, attention to input)
       self.gru_decoder_out, self.gru_decoder_state = \
         tf.nn.dynamic_rnn(self.gru_dec, embedded_input_3d, dtype=tf.float32, initial_state=decoder_zero_state)
 
-      print("gru decoder out: ", self.gru_decoder_out)
       predicted_logits = self.gru_decoder_out[0]
 
       target_probs_flat     = tf.reshape(self.output_data_ph, shape=[-1, out_vocab_size])
@@ -94,7 +86,6 @@ class NMT(object):
       print("self loss: ", self.loss)
 
       if train:
-        #optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
         optimizer = tf.train.AdadeltaOptimizer(learning_rate=1.0, epsilon=1e-06)
         grads_and_vars = optimizer.compute_gradients(self.loss)
         capped_grads = [(grad if grad is None else tf.clip_by_norm(grad, 1.0), var) for grad, var in grads_and_vars]
@@ -120,8 +111,7 @@ class NMT(object):
 
     feeds = {
       self.input_data_ph   : X,
-      self.output_data_ph  : y,
-      self.dropout_prob_ph : 0.8
+      self.output_data_ph  : y
     }
 
     loss, attention, _ = self.session.run(fetches, feeds)
@@ -142,8 +132,7 @@ class NMT(object):
 
     feeds = {
       self.input_data_ph   : X,
-      self.output_data_ph  : y,
-      self.dropout_prob_ph : 1.0
+      self.output_data_ph  : y
     }
 
     loss, predictions, attention = self.session.run(fetches, feeds)
@@ -161,18 +150,12 @@ class NMT(object):
     ]
 
     feeds = {
-      self.input_data_ph   : X,
-      self.dropout_prob_ph : 1.0
+      self.input_data_ph   : X
     }
 
     predictions, attention = self.session.run(fetches, feeds)
 
     return predictions, attention
-
-  def predictBeamSearch(self, X, beam_size=5):
-    pass
-
-  def 
 
   def saveParams(self, save_dir, global_step):
     '''
