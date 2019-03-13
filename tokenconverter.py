@@ -10,10 +10,11 @@ def tokensToOneHots(tokens, vocab_size):
   '''
   one_hots = np.zeros((len(tokens), vocab_size))
   for i, t in enumerate(tokens):
-    if t == 30002:
-      one_hots[i, t-1] = 1.0
-    else:
-      one_hots[i, t] = 1.0
+    #if t == 30002:
+    #  one_hots[i, t-1] = 1.0
+    #else:
+    #  one_hots[i, t] = 1.0
+    one_hots[i, t - 1] = 1.0
   return one_hots
 
 def tokensToWords(tokens, dictionary, no_unk=True):
@@ -56,7 +57,7 @@ def softmaxesToWords(softmaxes, dictionary, no_unk=True):
   tokens = []
   for sm in softmaxes:
     token = sm.argmax()
-    tokens.append(token)
+    tokens.append(token + 1)
   return tokensToWords(tokens, dictionary, no_unk)
 
 def topKPredictions(softmaxes, k, dictionary):
@@ -67,11 +68,14 @@ def topKPredictions(softmaxes, k, dictionary):
   k: some int
   dictionary: {token1:word1, token2:word2, ...}
   '''
-  top_k_tokens = []
+  topKTokens = []
+  topKProbs = []
   for sm in softmaxes:
     rearranged = [(i, p) for i, p in enumerate(sm)]
-    rearranged = sorted(rearranged, key=(lambda s: s[1]))
-    top_word_k_tokens = [t[0] for t in rearranged[:k]]
-    top_k_tokens.append(tuple(top_k))
-  top_k_words = [tokensToWords(t, dictionary) for t in top_k_tokens]
-  return top_k_words
+    rearranged = sorted(rearranged, key=(lambda s: s[1]))[::-1]
+    topKWordTokens = [t[0] + 1 for t in rearranged[:k]]
+    topKProbs.append(tuple([t[1] for t in rearranged[:k]]))
+    topKTokens.append(tuple(topKWordTokens))
+  topKWords = [tokensToWords(t, dictionary, no_unk=False) for t in topKTokens]
+  topKItems = [(w, p) for w, p in zip(topKWords, topKProbs)]
+  return topKItems

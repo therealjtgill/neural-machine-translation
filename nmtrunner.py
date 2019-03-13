@@ -61,3 +61,4 @@ if __name__ == "__main__":
   print("shape of predictions", predictions[0].shape)
   print(softmaxesToWords(predictions[0][0], tar_tokens_to_words, no_unk=False))
 
+  print(topKPredictions(predictions[0][0], 5, tar_tokens_to_words))
