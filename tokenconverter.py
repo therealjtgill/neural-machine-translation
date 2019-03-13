@@ -10,10 +10,6 @@ def tokensToOneHots(tokens, vocab_size):
   '''
   one_hots = np.zeros((len(tokens), vocab_size))
   for i, t in enumerate(tokens):
-    #if t == 30002:
-    #  one_hots[i, t-1] = 1.0
-    #else:
-    #  one_hots[i, t] = 1.0
     one_hots[i, t - 1] = 1.0
   return one_hots
 

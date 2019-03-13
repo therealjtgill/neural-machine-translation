@@ -66,6 +66,7 @@ class NMT(object):
       decoder_initial_state = tf.nn.tanh(tf.matmul(self.gru_encoder_out[1][:, 0, :], W_decoder_init))
       print("decoder initial state: ", decoder_initial_state)
       gru_encoder_states = tf.concat(self.gru_encoder_out, axis=-1)
+
       self.gru_dec = DecoderCell(num_encoder_nodes*2, num_decoder_nodes, gru_encoder_states, output_vocab_size=out_vocab_size)
       self.gru_dec_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_dec, output_keep_prob=self.dropout_prob_ph)
       decoder_zero_state = list(self.gru_dec_dropout.zero_state(batch_size, dtype=tf.float32))
