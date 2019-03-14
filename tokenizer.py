@@ -75,7 +75,7 @@ def main(args):
   if args.tokendict == None:
     with open(args.text, "r") as inputLines:
       for i, line in enumerate(inputLines):
-        tokenizedLine = word_tokenize(line)
+        tokenizedLine = word_tokenize(line, args.language)
         for token in tokenizedLine:
           if token.lower() in wordFreqs:
             wordFreqs[token.lower()] += 1
