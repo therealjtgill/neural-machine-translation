@@ -5,6 +5,20 @@ from nltk.tokenize import word_tokenize
 import os
 import sys
 
+def getMostCommonWords(wordFrequencies, k):
+  '''
+  Assumes that the dictionary contains 
+  {"word": count, ...}
+  '''
+
+  words = [word for word in wordFrequencies]
+  allWords = sorted(words, key=(lambda w: wordFrequencies[w]))[::-1]
+  print("There are ", len(allWords), " words in the corpus.")
+  print(allWords[0:100])
+  #sys.exit()
+  mostCommonWords = allWords[0:k]
+  return mostCommonWords
+
 def main(args):
   # Assumes that data is aligned by newline characters.
 
@@ -56,20 +70,32 @@ def main(args):
     print("Output path", args.output, "already exists.")
     print("New tokenizations will be placed here.")
 
-  textFile = open(args.text)
-  allLines = textFile.readlines()
+  #textFile = open(args.text)
+  #allLines = textFile.readlines()
 
-  allSentences = " ".join(allLines)
-  textFile.close()
+  #allSentences = " ".join(allLines)
+  #textFile.close()
 
+  wordFreqs = {}
   topKTokens = {}
   if args.tokendict == None:
-    print("Opened the text file.")
-    allWords = word_tokenize(allSentences)
-    print("Loaded all sentences.")
-    wordFreqs = nltk.FreqDist(w.lower() for w in allWords)
+    #tokenizedLines = []
+    with open(args.text, "r") as inputLines:
+      for i, line in enumerate(inputLines):
+        tokenizedLine = word_tokenize(line)
+        for token in tokenizedLine:
+          if token.lower() in wordFreqs:
+            wordFreqs[token.lower()] += 1
+          else:
+            wordFreqs[token.lower()] = 1
+        
+    #print("Opened the text file.")
+    #allWords = " ".join(tokenizedLines)
+    #print("Loaded all sentences.")
+    #wordFreqs = nltk.FreqDist(w.lower() for w in allWords)
     print("Got all lowercase word frequencies.")
-    topKWordFreqs = wordFreqs.most_common(int(args.topk))
+    #topKWordFreqs = wordFreqs.most_common(int(args.topk))
+    topKWordFreqs = getMostCommonWords(wordFreqs, args.topk)
     print("Got the topk words from the file.")
     topKWords = [w[0] for w in topKWordFreqs]
     print(topKWords[0:100])
@@ -82,18 +108,20 @@ def main(args):
     with open(args.tokendict, "r") as td:
       topKTokens = json.load(td)
 
-  with open(os.path.join(args.output, "tokenized." + args.language), "w") as outFile:
-    for line in allLines:
-      lineTokens = word_tokenize(line, args.language)
-      lineTokens = [t.lower() for t in lineTokens]
-      tokenizedLine = [str(topKTokens[t]) if t in topKTokens else str(int(args.topk) + 1) for t in lineTokens]
-      tokenizedLine = " ".join(tokenizedLine)
-      outFile.write(tokenizedLine + "\n")
+  with open(args.text, "r") as inputLines:
+    with open(os.path.join(args.output, "tokenized." + args.language), "w") as outFile:
+      for line in inputLines:
+        lineTokens = word_tokenize(line, args.language)
+        lineTokens = [t.lower() for t in lineTokens]
+        tokenizedLine = [str(topKTokens[t]) if t in topKTokens else str(int(args.topk) + 1) for t in lineTokens]
+        tokenizedLine = " ".join(tokenizedLine)
+        outFile.write(tokenizedLine + "\n")
 
   print("Wrote the tokenized file back to the hard drive.")
 
   topKTokens["<unk>"] = int(args.topk + 1)
   topKTokens["<end>"] = int(args.topk + 2)
+  topKTokens["<start"]= int(args.topk + 3)
   wordIndexDict = open(os.path.join(args.output, "dictionary." + args.language), "w")
   topKTokensJson = json.dump(topKTokens, wordIndexDict)
   #wordIndexDict.write(topKTokensJson)
