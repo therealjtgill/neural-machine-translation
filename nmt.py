@@ -19,7 +19,7 @@ class NMT(object):
     num_encoder_nodes     = 1000
     num_decoder_nodes     = 1000
 
-    with tf.variable_scope("nmt"):
+    with tf.variable_scope("nmt", reuse=False):
       self.saver = None
       self.input_data_ph   = tf.placeholder(dtype=tf.float32, shape=[None, None, in_vocab_size])
       self.output_data_ph  = tf.placeholder(dtype=tf.float32, shape=[None, None, out_vocab_size])
@@ -96,11 +96,9 @@ class NMT(object):
       print("self loss: ", self.loss)
 
       if train:
-        #optimizer = tf.train.RMSPropOptimizer(learning_rate=0.0001, momentum=0.95)
         optimizer = tf.train.AdadeltaOptimizer(learning_rate=1.0, epsilon=1e-06)
         grads_and_vars = optimizer.compute_gradients(self.loss)
         capped_grads = [(grad if grad is None else tf.clip_by_norm(grad, 1.0), var) for grad, var in grads_and_vars]
-
         self.train_op = optimizer.apply_gradients(capped_grads)
 
       if save:
