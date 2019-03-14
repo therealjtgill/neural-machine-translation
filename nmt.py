@@ -73,7 +73,6 @@ class NMT(object):
       print("decoder state: ", decoder_zero_state)
       decoder_zero_state[0] = decoder_initial_state
       decoder_zero_state = tuple(decoder_zero_state)
-      print("decoder state: ", decoder_zero_state)
       print("state size decoder: ", self.gru_dec_dropout.state_size)
 
       # The decoder output for a single timestep is a tuple of:
