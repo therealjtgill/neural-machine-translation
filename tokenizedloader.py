@@ -156,14 +156,6 @@ class DataHandler(object):
 
     print("Ignoring ", len(ignore_lines), " lines of text.")
 
-#    for i, ignore_index in enumerate(ignore_lines):
-#      if ignore_index in train_indices:
-#        train_indices.pop(train_indices.index(ignore_index))
-#      if ignore_index in test_indices:
-#        test_indices.pop(test_indices.index(ignore_index))
-#      if ignore_index in validate_indices:
-#        validate_indices.pop(validate_indices.index(ignore_index))
-#      print("line", i, "out of", len(ignore_lines), "          \r", end="")
     print("len train indices: ", len(train_indices))
     train_indices_ = sorted(list(set(train_indices) - set(ignore_lines)))
     test_indices_ = sorted(list(set(test_indices) - set(ignore_lines)))
@@ -189,7 +181,6 @@ class DataHandler(object):
                 train_indices.pop(0)
               print("line", i, "out of train set          \r", end="")
         else:
-          #if n == 0:
           _, self.train_files_size = self.getSentenceLengths(self.train_files[n])
           print(self.train_files_size)
         print()
@@ -201,8 +192,6 @@ class DataHandler(object):
             for j, line in enumerate(f1):
               if len(test_indices) == 0:
                 break
-              #if j in test_indices and j not in ignore_lines:
-              #if j in test_indices:
               if j == test_indices[0]:
                 tel1.write(line)
                 test_indices.pop(0)
@@ -220,8 +209,6 @@ class DataHandler(object):
             for k, line in enumerate(f1):
               if len(validate_indices) == 0:
                 break
-              #if k in validate_indices and k not in ignore_lines:
-              #if k in validate_indices:
               if k == validate_indices[0]:
                 val1.write(line)
                 validate_indices.pop(0)
@@ -244,7 +231,6 @@ class DataHandler(object):
     '''
     words = []
     for token in tokens:
-      #print(token)
       if no_unk:
         if dictionary[token] != "<unk>":
           words.append(dictionary[token])
@@ -317,6 +303,7 @@ class DataHandler(object):
     Expects vocab to be a dictionary of words to token numbers. It also expects
     that the <end> tag is the last token in the dictionary (numerically).
     '''
+    # Need to add a single "<start>" to the front of the string
     max_line_length = 0
     if seq_length == None:
       max_line_length = max([len(l.split(" ")) for l in lines]) + 1
@@ -325,15 +312,17 @@ class DataHandler(object):
     batch_size = len(lines)
     vocab_size = len(vocab)
     one_hots = np.zeros((batch_size, max_line_length, vocab_size))
-    one_hots[:, :, vocab_size - 1] = 1.0
+    one_hots[:, 1:, vocab_size - 2] = 1.0 # Janky way to pad with "<end>" vectors
+    one_hots[:, 0, vocab_size - 1] = 1.0 # Janky way to front-pad with "<start>" vectors
+
 
     for bs in range(batch_size):
       line_tokens = lines[bs].strip().split(" ")
       #print("line tokens: ", lines[bs], line_tokens)
       for sl in range(len(line_tokens)):
         hot_index = int(line_tokens[sl]) - 1 # Tokens are 1-indexed
-        one_hots[bs, sl, vocab_size - 1] = 0.0
-        one_hots[bs, sl, hot_index] = 1.0
+        one_hots[bs, sl + 1, vocab_size - 2] = 0.0
+        one_hots[bs, sl + 1, hot_index] = 1.0
       #one_hots[bs, len(line_tokens), vocab_size - 1] = 1.0
 
     return one_hots
