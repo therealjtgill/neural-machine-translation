@@ -95,9 +95,9 @@ def main(args):
     #wordFreqs = nltk.FreqDist(w.lower() for w in allWords)
     print("Got all lowercase word frequencies.")
     #topKWordFreqs = wordFreqs.most_common(int(args.topk))
-    topKWordFreqs = getMostCommonWords(wordFreqs, args.topk)
+    topKWords = getMostCommonWords(wordFreqs, args.topk)
     print("Got the topk words from the file.")
-    topKWords = [w[0] for w in topKWordFreqs]
+    #topKWords = [w[0] for w in topKWordFreqs]
     print(topKWords[0:100])
 
     topKTokens = {w:v + 1 for v, w in enumerate(topKWords)}
@@ -124,7 +124,6 @@ def main(args):
   topKTokens["<start"]= int(args.topk + 3)
   wordIndexDict = open(os.path.join(args.output, "dictionary." + args.language), "w")
   topKTokensJson = json.dump(topKTokens, wordIndexDict)
-  #wordIndexDict.write(topKTokensJson)
   wordIndexDict.close()
 
   print("Generated the token:word dictionary.")
