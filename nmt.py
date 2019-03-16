@@ -19,7 +19,7 @@ class NMT(object):
     num_encoder_nodes     = 1000
     num_decoder_nodes     = 1000
 
-    with tf.variable_scope("nmt", reuse=False):
+    with tf.variable_scope("nmt_train", reuse=False):
       self.saver = None
       self.input_data_ph   = tf.placeholder(dtype=tf.float32, shape=[None, None, in_vocab_size])
       self.output_data_ph  = tf.placeholder(dtype=tf.float32, shape=[None, None, out_vocab_size])
@@ -38,11 +38,14 @@ class NMT(object):
       # Placeholders for forward and backward states of decoder bidirectional GRU.
       decoder_h_ph = tf.placeholder(dtype=tf.float32, shape=[None, num_encoder_nodes])
 
-      self.W_in_embed  = tf.Variable(tf.random_normal((in_vocab_size,
-                                                       embedding_size),
-                                                      stddev=0.01))
-      self.bw_in_embed = tf.Variable(tf.random_normal((embedding_size,),
-                                                      stddev=0.01))
+      self.W_in_embed  = tf.get_variable(
+        "W_in_embed",
+        shape=(in_vocab_size, embedding_size)
+        initializer=tf.random_normal(stddev=0.01))
+      self.bw_in_embed = tf.get_variable(
+        "bw_in_embed",
+        shape=(embedding_size,),
+        initializer=tf.random_normal(stddev=0.01))
 
       input_2d = tf.reshape(self.input_data_ph, [-1, in_vocab_size])
       embedded_input_2d = tf.nn.relu(tf.matmul(input_2d, self.W_in_embed) + self.bw_in_embed)
@@ -50,26 +53,46 @@ class NMT(object):
 
       # Using GRUs because their outputs are the same as their hidden states,
       # which makes grabbing all unrolled hidden states possible.
-      self.gru_encoder_fw = tf.nn.rnn_cell.GRUCell(num_encoder_nodes, kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
-      self.gru_encoder_bw = tf.nn.rnn_cell.GRUCell(num_encoder_nodes, kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
-      self.gru_encoder_fw_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_encoder_fw, output_keep_prob=self.dropout_prob_ph)
-      self.gru_encoder_bw_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_encoder_bw, output_keep_prob=self.dropout_prob_ph)
+      self.gru_encoder_fw = tf.nn.rnn_cell.GRUCell(
+        num_encoder_nodes,
+        kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
+      self.gru_encoder_bw = tf.nn.rnn_cell.GRUCell(
+        num_encoder_nodes,
+        kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
+      self.gru_encoder_fw_dropout = tf.nn.rnn_cell.DropoutWrapper(
+        self.gru_encoder_fw,
+        output_keep_prob=self.dropout_prob_ph)
+      self.gru_encoder_bw_dropout = tf.nn.rnn_cell.DropoutWrapper(
+        self.gru_encoder_bw,
+        output_keep_prob=self.dropout_prob_ph)
 
       self.gru_encoder_out, self.gru_encoder_state = \
-        tf.nn.bidirectional_dynamic_rnn(self.gru_encoder_fw_dropout,
-                                        self.gru_encoder_bw_dropout,
-                                        embedded_input_3d,
-                                        dtype=tf.float32)
+        tf.nn.bidirectional_dynamic_rnn(
+          self.gru_encoder_fw_dropout,
+          self.gru_encoder_bw_dropout,
+          embedded_input_3d,
+          dtype=tf.float32)
 
-      W_decoder_init = tf.Variable(tf.random_normal((num_encoder_nodes, num_encoder_nodes)))
+      W_decoder_init = tf.get_variable(
+        "W_decoder_init",
+        shape=(num_encoder_nodes, num_encoder_nodes)
+        initializer=tf.random_normal())
       print("gru encoder out: ", self.gru_encoder_out)
-      decoder_initial_state = tf.nn.tanh(tf.matmul(self.gru_encoder_out[1][:, 0, :], W_decoder_init))
+      decoder_initial_state = \
+        tf.nn.tanh(tf.matmul(self.gru_encoder_out[1][:, 0, :], W_decoder_init))
       print("decoder initial state: ", decoder_initial_state)
       gru_encoder_states = tf.concat(self.gru_encoder_out, axis=-1)
 
-      self.gru_dec = DecoderCell(num_encoder_nodes*2, num_decoder_nodes, gru_encoder_states, output_vocab_size=out_vocab_size)
-      self.gru_dec_dropout = tf.nn.rnn_cell.DropoutWrapper(self.gru_dec, output_keep_prob=self.dropout_prob_ph)
-      decoder_zero_state = list(self.gru_dec_dropout.zero_state(batch_size, dtype=tf.float32))
+      self.gru_dec = DecoderCell(
+        num_encoder_nodes*2,
+        num_decoder_nodes,
+        gru_encoder_states,
+        output_vocab_size=out_vocab_size)
+      self.gru_dec_dropout = tf.nn.rnn_cell.DropoutWrapper(
+        self.gru_dec,
+        output_keep_prob=self.dropout_prob_ph)
+      decoder_zero_state = \
+        list(self.gru_dec_dropout.zero_state(batch_size, dtype=tf.float32))
       print("decoder state: ", decoder_zero_state)
       decoder_zero_state[0] = decoder_initial_state
       decoder_zero_state = tuple(decoder_zero_state)
@@ -78,15 +101,25 @@ class NMT(object):
       # The decoder output for a single timestep is a tuple of:
       #   (softmax over target vocabulary, attention to input)
       self.gru_decoder_out, self.gru_decoder_state = \
-        tf.nn.dynamic_rnn(self.gru_dec_dropout, embedded_input_3d, dtype=tf.float32, initial_state=decoder_zero_state)
+        tf.nn.dynamic_rnn(
+          self.gru_dec_dropout,
+          embedded_input_3d,
+          dtype=tf.float32,
+          initial_state=decoder_zero_state)
 
       print("gru decoder out: ", self.gru_decoder_out)
       predicted_logits = self.gru_decoder_out[0]
 
-      target_probs_flat     = tf.reshape(self.output_data_ph, shape=[-1, out_vocab_size])
-      predicted_logits_flat = tf.reshape(predicted_logits, shape=[-1, out_vocab_size])
-      self.predictions      = tf.nn.softmax(predicted_logits, axis=-1)
-      self.attention        = self.gru_decoder_out[1]
+      target_probs_flat     = tf.reshape(
+        self.output_data_ph,
+        shape=[-1, out_vocab_size])
+
+      predicted_logits_flat = tf.reshape(
+        predicted_logits,
+        shape=[-1, out_vocab_size])
+
+      self.predictions = tf.nn.softmax(predicted_logits, axis=-1)
+      self.attention   = self.gru_decoder_out[1]
 
       cross_entropy_2d = tf.nn.softmax_cross_entropy_with_logits_v2(labels=target_probs_flat, logits=predicted_logits_flat)
       cross_entropy_3d = tf.reshape(cross_entropy_2d, shape=[batch_size, seq_length_dec, -1])
@@ -102,6 +135,33 @@ class NMT(object):
 
       if save:
         self.saver = tf.train.Saver(max_to_keep=20)
+
+    with tf.variable_scope("nmt_test", reuse=True):
+      self.decoder_input_ph  = tf.placeholder(dtype=tf.float32, shape=self.gru_dec_dropout.state_size)
+      self.encoder_output_ph = tf.placeholder(dtype=tf.float32, shape=[1, None, num_encoder_nodes]) # Not sure I need this?
+
+      self.gru_decoder_test = DecoderCell(
+        num_encoder_nodes*2,
+        num_decoder_nodes,
+        gru_encoder_states,
+        output_vocab_size=out_vocab_size)
+
+      self.gru_decoder_test_out, self.gru_decoder_test_state = \
+        tf.nn.dynamic_rnn(
+          self.gru_dec_test,
+          self.encoder_output_ph,
+          dtype=tf.float32,
+          initial_state=self.decoder_input_ph)
+
+      print("gru decoder test out: ", self.gru_decoder_test_out)
+      predicted_test_logits = self.gru_decoder_test_out[0]
+
+      predicted_logits_flat = tf.reshape(
+        predicted_logits,
+        shape=[-1, out_vocab_size])
+
+      self.predictions = tf.nn.softmax(predicted_logits, axis=-1)
+      self.attention   = self.gru_decoder_out[1]
 
   def trainStep(self, X, y):
     '''
