@@ -6,6 +6,7 @@ from numpy.random import rand
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import gen_math_ops
 from tensorflow.python.ops import gen_nn_ops
+from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import linalg_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn_ops
@@ -45,79 +46,79 @@ class DecoderCell(RNNCell):
     self.W_a  = vs.get_variable(
       "W_a",
       shape=[self._gru_size, attention_size],
-      initializer=random_ops.random_normal(stddev=0.001))
+      initializer=init_ops.random_normal_initializer(stddev=0.001))
     self.bw_a = vs.get_variable(
       "bw_a",
       shape=[attention_size],
-      initializer=random_ops.random_normal(stddev=0.001))
+      initializer=init_ops.random_normal_initializer(stddev=0.001))
 
     # Will be multiplied by hidden state from encoder.
     self.U_a  = vs.get_variable(
       "U_a",
       shape=[self._input_size, attention_size],
-      initializer=random_ops.random_normal(stddev=0.001))
+      initializer=init_ops.random_normal_initializer(stddev=0.001))
     self.bu_a = vs.get_variable(
       "bu_a",
       shape=[attention_size],
-      initializer=random_ops.random_normal(stddev=0.001))
+      initializer=init_ops.random_normal_initializer(stddev=0.001))
 
     # Used to get logits for attention mechanism.
     self.v_a  = vs.get_variable(
       "v_a",
       shape=[attention_size],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
 
     # Embedding matrix.
     self.E    = vs.get_variable(
       "E",
-      shape=[self._output_vocab_size,
-      initializer=random_ops.random_normal(self._output_embedding_size], stddev=0.01))
+      shape=[self._output_vocab_size, self._output_embedding_size],
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
 
     # Maxout #1 variables.
     self.U_p  = vs.get_variable(
       "U_p",
       shape=[self._gru_size, 500],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
     self.V_p  = vs.get_variable(
       "V_p",
       shape=[self._output_embedding_size, 500],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
     self.C_p  = vs.get_variable(
       "C_p",
       shape=[2*self._gru_size, 500],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
     self.b_p  = vs.get_variable(
       "b_p",
       shape=[500],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
 
     # Maxout #2 variables.
     self.U_q  = vs.get_variable(
       "U_q",
       shape=[self._gru_size, 500],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
     self.V_q  = vs.get_variable(
       "V_q",
       shape=[self._output_embedding_size, 500],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
     self.C_q  = vs.get_variable(
       "C_q",
       shape=[2*self._gru_size, 500],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
     self.b_q  = vs.get_variable(
       "b_q",
       shape=[500],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
 
     # Logits variables.
     self.W_o  = vs.get_variable(
       "W_o",
       shape=[500, self._output_vocab_size],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
     self.bw_o = vs.get_variable(
       "bw_o",
       shape=[self._output_vocab_size],
-      initializer=random_ops.random_normal(stddev=0.01))
+      initializer=init_ops.random_normal_initializer(stddev=0.01))
 
     # Shape = [batch_size, in_seq_length, 512]]
     self._precomputed = tf.einsum("bti,if->btf", self._encoder_output, self.U_a)

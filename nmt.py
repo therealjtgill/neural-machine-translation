@@ -19,7 +19,7 @@ class NMT(object):
     num_encoder_nodes     = 1000
     num_decoder_nodes     = 1000
 
-    with tf.variable_scope("nmt_train", reuse=False):
+    with tf.variable_scope("nmt", reuse=False):
       self.saver = None
       self.input_data_ph   = tf.placeholder(dtype=tf.float32, shape=[None, None, in_vocab_size])
       self.output_data_ph  = tf.placeholder(dtype=tf.float32, shape=[None, None, out_vocab_size])
@@ -40,12 +40,12 @@ class NMT(object):
 
       self.W_in_embed  = tf.get_variable(
         "W_in_embed",
-        shape=(in_vocab_size, embedding_size)
-        initializer=tf.random_normal(stddev=0.01))
+        shape=(in_vocab_size, embedding_size),
+        initializer=tf.initializers.random_normal(stddev=0.01))
       self.bw_in_embed = tf.get_variable(
         "bw_in_embed",
         shape=(embedding_size,),
-        initializer=tf.random_normal(stddev=0.01))
+        initializer=tf.initializers.random_normal(stddev=0.01))
 
       input_2d = tf.reshape(self.input_data_ph, [-1, in_vocab_size])
       embedded_input_2d = tf.nn.relu(tf.matmul(input_2d, self.W_in_embed) + self.bw_in_embed)
@@ -75,10 +75,10 @@ class NMT(object):
 
       W_decoder_init = tf.get_variable(
         "W_decoder_init",
-        shape=(num_encoder_nodes, num_encoder_nodes)
-        initializer=tf.random_normal())
+        shape=(num_encoder_nodes, num_encoder_nodes),
+        initializer=tf.initializers.random_normal())
       print("gru encoder out: ", self.gru_encoder_out)
-      decoder_initial_state = \
+      decoder_initial_gru_state = \
         tf.nn.tanh(tf.matmul(self.gru_encoder_out[1][:, 0, :], W_decoder_init))
       print("decoder initial state: ", decoder_initial_state)
       gru_encoder_states = tf.concat(self.gru_encoder_out, axis=-1)
@@ -91,11 +91,11 @@ class NMT(object):
       self.gru_dec_dropout = tf.nn.rnn_cell.DropoutWrapper(
         self.gru_dec,
         output_keep_prob=self.dropout_prob_ph)
-      decoder_zero_state = \
+      decoder_initial_state = \
         list(self.gru_dec_dropout.zero_state(batch_size, dtype=tf.float32))
-      print("decoder state: ", decoder_zero_state)
-      decoder_zero_state[0] = decoder_initial_state
-      decoder_zero_state = tuple(decoder_zero_state)
+      print("decoder state: ", decoder_initial_state)
+      decoder_initial_state[0] = decoder_initial_gru_state
+      decoder_initial_state = tuple(decoder_initial_state)
       print("state size decoder: ", self.gru_dec_dropout.state_size)
 
       # The decoder output for a single timestep is a tuple of:
@@ -105,7 +105,7 @@ class NMT(object):
           self.gru_dec_dropout,
           embedded_input_3d,
           dtype=tf.float32,
-          initial_state=decoder_zero_state)
+          initial_state=decoder_initial_state)
 
       print("gru decoder out: ", self.gru_decoder_out)
       predicted_logits = self.gru_decoder_out[0]
@@ -136,8 +136,11 @@ class NMT(object):
       if save:
         self.saver = tf.train.Saver(max_to_keep=20)
 
-    with tf.variable_scope("nmt_test", reuse=True):
-      self.decoder_input_ph  = tf.placeholder(dtype=tf.float32, shape=self.gru_dec_dropout.state_size)
+    with tf.variable_scope("nmt", reuse=True):
+      print(self.gru_dec_dropout.state_size)
+      # The last element of the decoder's state is not used by the decoder, it's just for making pretty attention plots.
+      # Actually... this might not be right. The placeholder needs to be a tuple of matrices.
+      self.decoder_input_ph  = tf.placeholder(dtype=tf.float32, shape=self.gru_dec_dropout.state_size[:2])
       self.encoder_output_ph = tf.placeholder(dtype=tf.float32, shape=[1, None, num_encoder_nodes]) # Not sure I need this?
 
       self.gru_decoder_test = DecoderCell(
@@ -146,9 +149,11 @@ class NMT(object):
         gru_encoder_states,
         output_vocab_size=out_vocab_size)
 
+      decoder_input_state = list(self.gru_decoder_test.zero_state(1, dtype=tf.float32))
+      #decoder_input_state[0] = decoder_input_ph
       self.gru_decoder_test_out, self.gru_decoder_test_state = \
         tf.nn.dynamic_rnn(
-          self.gru_dec_test,
+          self.gru_decoder_test,
           self.encoder_output_ph,
           dtype=tf.float32,
           initial_state=self.decoder_input_ph)
