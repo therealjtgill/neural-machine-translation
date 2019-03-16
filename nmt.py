@@ -80,7 +80,7 @@ class NMT(object):
       print("gru encoder out: ", self.gru_encoder_out)
       decoder_initial_gru_state = \
         tf.nn.tanh(tf.matmul(self.gru_encoder_out[1][:, 0, :], W_decoder_init))
-      print("decoder initial state: ", decoder_initial_state)
+      print("decoder initial state: ", decoder_initial_gru_state)
       gru_encoder_states = tf.concat(self.gru_encoder_out, axis=-1)
 
       self.gru_dec = DecoderCell(
@@ -140,23 +140,26 @@ class NMT(object):
       print(self.gru_dec_dropout.state_size)
       # The last element of the decoder's state is not used by the decoder, it's just for making pretty attention plots.
       # Actually... this might not be right. The placeholder needs to be a tuple of matrices.
-      self.decoder_input_ph  = tf.placeholder(dtype=tf.float32, shape=self.gru_dec_dropout.state_size[:2])
-      self.encoder_output_ph = tf.placeholder(dtype=tf.float32, shape=[1, None, num_encoder_nodes]) # Not sure I need this?
+      self.decoder_gru_input_ph         = tf.placeholder(dtype=tf.float32, shape=(1, self.gru_dec_dropout.state_size[0]))
+      self.decoder_prev_logits_input_ph = tf.placeholder(dtype=tf.float32, shape=(1, self.gru_dec_dropout.state_size[1]))
+      self.encoder_output_ph            = tf.placeholder(dtype=tf.float32, shape=[1, None, 2*num_encoder_nodes]) # Not sure I need this?
 
       self.gru_decoder_test = DecoderCell(
         num_encoder_nodes*2,
         num_decoder_nodes,
-        gru_encoder_states,
+        self.encoder_output_ph,
         output_vocab_size=out_vocab_size)
 
       decoder_input_state = list(self.gru_decoder_test.zero_state(1, dtype=tf.float32))
-      #decoder_input_state[0] = decoder_input_ph
+      decoder_input_state[0] = self.decoder_gru_input_ph
+      decoder_input_state[1] = self.decoder_prev_logits_input_ph
+      decoder_input_state = tuple(decoder_input_state)
       self.gru_decoder_test_out, self.gru_decoder_test_state = \
         tf.nn.dynamic_rnn(
           self.gru_decoder_test,
           self.encoder_output_ph,
           dtype=tf.float32,
-          initial_state=self.decoder_input_ph)
+          initial_state=decoder_input_state)
 
       print("gru decoder test out: ", self.gru_decoder_test_out)
       predicted_test_logits = self.gru_decoder_test_out[0]
