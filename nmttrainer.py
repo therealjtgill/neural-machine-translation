@@ -62,11 +62,17 @@ def main(argv):
     help        = "The location of a configuration file to load and continue training \
                    (e.g. some saved parameters)")
 
+  parser.add_argument("-m", "--maxlinelength",
+    required    = False,
+    default     = 51,
+    type        = int,
+    help        = "The maximum sequence length of a batch retrieved from the dataset.")
+
   args = parser.parse_args()
 
   dh = DataHandler(args.englishtext, args.englishdict, args.targettext, args.targetdict)
   sess = tf.Session()
-  nmt = NMT(sess, in_vocab_size=dh.vocab_sizes[0], out_vocab_size=dh.vocab_sizes[1])
+  nmt = NMT(sess, in_vocab_size=dh.vocab_sizes[0], out_vocab_size=dh.vocab_sizes[1], teacher_forcing=True)
   sess.run(tf.global_variables_initializer())
   if args.loadconfig != None:
     nmt.loadParams(args.loadconfig)
@@ -90,7 +96,7 @@ def main(argv):
       print("\n\n\n       new epoch!        \n\n\n", curr_epoch_count)
       prev_epoch_count = dh.num_epochs_elapsed
     new_batch = dh.getTrainBatch(args.batchsize)
-    while new_batch[0].shape[1] > 53:
+    while new_batch[0].shape[1] > args.maxlinelength:
       print("That batch was too big, getting another one.")
       new_batch = dh.getTrainBatch(args.batchsize)
     loss, _ = nmt.trainStep(new_batch[0], new_batch[1])
