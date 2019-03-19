@@ -306,13 +306,13 @@ class DataHandler(object):
     # Need to add a single "<start>" to the front of the string
     max_line_length = 0
     if seq_length == None:
-      max_line_length = max([len(l.split(" ")) for l in lines]) + 1
+      max_line_length = max([len(l.split(" ")) for l in lines]) + 2
     else:
-      max_line_length = seq_length
+      max_line_length = seq_length + 1
     batch_size = len(lines)
     vocab_size = len(vocab)
     one_hots = np.zeros((batch_size, max_line_length, vocab_size))
-    one_hots[:, 1:, vocab_size - 2] = 1.0 # Janky way to pad with "<end>" vectors
+    one_hots[:, 1:, vocab_size - 2] = 1.0 # Janky way to end-pad with "<end>" vector
     one_hots[:, 0, vocab_size - 1] = 1.0 # Janky way to front-pad with "<start>" vectors
 
 
