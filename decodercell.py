@@ -23,23 +23,28 @@ class DecoderCell(RNNCell):
   snuck in.
   This is an implementation of Bahdanau's decoder cell (2015).
   '''
-  def __init__(self, input_size, gru_size, encoder_output, output_vocab_size=30000, output_embedding_size=620):
+  def __init__(self, input_size, gru_size, encoder_output, teacher_forcing=False, output_vocab_size=30000, output_embedding_size=620):
     print("encoder output: ", encoder_output)
+    self.r = 0.0
+    if teacher_forcing:
+      self.r = 0.6
+
+    assert((input_size % 2) == 0)
     self._input_size = input_size
-    assert((self._input_size % 2) == 0)
+
     self._gru_size = gru_size
     self._in_seq_length = tf.cast(tf.shape(encoder_output)[0], tf.int32)
+
     # The embedded output from the decoder and the attention vector are snuck in with the actual decoder state.
     self._output_embedding_size = output_embedding_size
     self._output_vocab_size = output_vocab_size
     self._output_size = (self._output_vocab_size, self._in_seq_length)
-    #self._state_size = (self._gru_size, output_embedding_size, self._in_seq_length)
     self._state_size = (self._gru_size, self._output_vocab_size, self._in_seq_length)
+
     # Shape = [batch_size, in_seq_length, input_size]
     self._encoder_output = encoder_output
 
     self._gru_cell = tf.nn.rnn_cell.GRUCell(self._gru_size, kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
-    #self._gru_cell = tf.nn.rnn_cell.GRUCell(self._output_embedding_size + self._input_size)
     attention_size = 1024
 
     # Will be multiplied by input state.
@@ -140,6 +145,9 @@ class DecoderCell(RNNCell):
     #return self._output_vocab_size
     return self._output_size
 
+  def get_embedding(self, softmax):
+    return tf.matmul(softmax, self.E)
+
   def __call__(self, inputs, state, scope=None):
     '''
     Inputs have the shape: [batch_size, _input_size]
@@ -154,9 +162,12 @@ class DecoderCell(RNNCell):
     with vs.variable_scope(scope or "decoder_cell"):
       # State smuggling
       state_true = state[0]
-      #y_prev = state[1]
+
       print("state[1]: ", state[1])
-      y_prev = math_ops.matmul(nn_ops.softmax(state[1]), self.E)
+      print("inputs: ", inputs)
+      #y_prev = math_ops.matmul(nn_ops.softmax(state[1]), self.E)
+      y_prev = math_ops.matmul(state[1], self.E)
+
       # Shape = [batch_size, in_seq_length, 512]]
       attention_d = tf.nn.tanh(tf.expand_dims(tf.matmul(state_true, self.W_a) + self.bw_a, axis=1) + self._precomputed)
       print("attention_d: ", attention_d)
@@ -183,8 +194,12 @@ class DecoderCell(RNNCell):
       out_logits = math_ops.matmul(t, self.W_o) + self.bw_o
 
       output = (out_logits, alpha)
-      
-      state_out = (gru_state, out_logits, alpha)
+
+      f1 = lambda : inputs
+      f2 = lambda : nn_ops.softmax(out_logits)
+      state_softmax = tf.cond(tf.less(tf.random_uniform([], 0.0, 1.0), self.r), f1, f2)
+
+      state_out = (gru_state, state_softmax, alpha)
       print("gru state: ", gru_state)
 
       return output, state_out
