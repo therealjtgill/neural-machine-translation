@@ -11,7 +11,8 @@ class NMT(object):
                in_vocab_size=30000,
                out_vocab_size=30000,
                save=True,
-               train=True):
+               train=True,
+               teacher_forcing=False):
     '''
     Set up the computation graph.
     '''
@@ -31,9 +32,6 @@ class NMT(object):
       batch_size     = tf.cast(tf.shape(self.input_data_ph)[0], tf.int32)
       seq_length_enc = tf.cast(tf.shape(self.input_data_ph)[1], tf.int32)
       seq_length_dec = tf.cast(tf.shape(self.output_data_ph)[1], tf.int32)
-
-      self.zero_states_enc  = []
-      self.zero_states_dec  = []
 
       # Placeholders for forward and backward states of decoder bidirectional GRU.
       decoder_h_ph = tf.placeholder(dtype=tf.float32, shape=[None, num_encoder_nodes])
@@ -103,7 +101,7 @@ class NMT(object):
       self.gru_decoder_out, self.gru_decoder_state = \
         tf.nn.dynamic_rnn(
           self.gru_dec_dropout,
-          embedded_input_3d,
+          self.output_data_ph,
           dtype=tf.float32,
           initial_state=decoder_initial_state)
 
@@ -140,9 +138,11 @@ class NMT(object):
       print(self.gru_dec_dropout.state_size)
       # The last element of the decoder's state is not used by the decoder, it's just for making pretty attention plots.
       # Actually... this might not be right. The placeholder needs to be a tuple of matrices.
-      self.decoder_gru_input_ph         = tf.placeholder(dtype=tf.float32, shape=(1, self.gru_dec_dropout.state_size[0]))
-      self.decoder_prev_logits_input_ph = tf.placeholder(dtype=tf.float32, shape=(1, self.gru_dec_dropout.state_size[1]))
-      self.encoder_output_ph            = tf.placeholder(dtype=tf.float32, shape=[1, None, 2*num_encoder_nodes]) # Not sure I need this?
+      self.decoder_gru_input_ph            = tf.placeholder(dtype=tf.float32, shape=(1, self.gru_dec_dropout.state_size[0]))
+      self.decoder_prev_softmaxes_input_ph = tf.placeholder(dtype=tf.float32, shape=(1, self.gru_dec_dropout.state_size[1]))
+      self.encoder_output_ph               = tf.placeholder(dtype=tf.float32, shape=[1, None, 2*num_encoder_nodes])
+
+      fake_decoder_inputs = tf.zeros([1, 1, self.gru_dec_dropout.state_size[1]])
 
       self.gru_decoder_test = DecoderCell(
         num_encoder_nodes*2,
@@ -152,12 +152,13 @@ class NMT(object):
 
       decoder_input_state = list(self.gru_decoder_test.zero_state(1, dtype=tf.float32))
       decoder_input_state[0] = self.decoder_gru_input_ph
-      decoder_input_state[1] = self.decoder_prev_logits_input_ph
+      decoder_input_state[1] = self.decoder_prev_softmaxes_input_ph
       decoder_input_state = tuple(decoder_input_state)
       self.gru_decoder_test_out, self.gru_decoder_test_state = \
         tf.nn.dynamic_rnn(
           self.gru_decoder_test,
-          self.encoder_output_ph,
+          #self.decoder_prev_softmaxes_input_ph,
+          fake_decoder_inputs,
           dtype=tf.float32,
           initial_state=decoder_input_state)
 
@@ -178,6 +179,8 @@ class NMT(object):
     shape(X) = [batch_size, in_seq_length, in_vocab_size]
     shape(y) = [batch_size, out_seq_length, out_vocab_size]
     '''
+
+    print("Shape of target output: ", y.shape)
 
     fetches = [
       self.loss,
