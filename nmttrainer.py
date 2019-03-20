@@ -72,7 +72,7 @@ def main(argv):
 
   dh = DataHandler(args.englishtext, args.englishdict, args.targettext, args.targetdict)
   sess = tf.Session()
-  nmt = NMT(sess, in_vocab_size=dh.vocab_sizes[0], out_vocab_size=dh.vocab_sizes[1], teacher_forcing=True)
+  nmt = NMT(sess, in_vocab_size=dh.vocab_sizes[0], out_vocab_size=dh.vocab_sizes[1])
   sess.run(tf.global_variables_initializer())
   if args.loadconfig != None:
     nmt.loadParams(args.loadconfig)
@@ -104,7 +104,6 @@ def main(argv):
     if np.isnan(loss):
       print("Found a loss that is nan... exiting.")
       sys.exit(-1)
-    print("train on, mothafucka")
     loss_file.write(str(loss) + "\n")
     if (i % 50) == 0:
       predictions, attention = nmt.predict(new_batch[0])
