@@ -23,11 +23,10 @@ class DecoderCell(RNNCell):
   snuck in.
   This is an implementation of Bahdanau's decoder cell (2015).
   '''
-  def __init__(self, input_size, gru_size, encoder_output, teacher_forcing=False, output_vocab_size=30000, output_embedding_size=620):
+  def __init__(self, input_size, gru_size, encoder_output, teacher_forcing=tf.constant(False, dtype=tf.bool), output_vocab_size=30000, output_embedding_size=620):
     print("encoder output: ", encoder_output)
-    self.r = 0.0
-    if teacher_forcing:
-      self.r = 0.6
+
+    self._teacher_forcing = teacher_forcing
 
     assert((input_size % 2) == 0)
     self._input_size = input_size
@@ -197,7 +196,7 @@ class DecoderCell(RNNCell):
 
       f1 = lambda : inputs
       f2 = lambda : nn_ops.softmax(out_logits)
-      state_softmax = tf.cond(tf.less(tf.random_uniform([], 0.0, 1.0), self.r), f1, f2)
+      state_softmax = tf.cond(self._teacher_forcing, f1, f2)
 
       state_out = (gru_state, state_softmax, alpha)
       print("gru state: ", gru_state)
