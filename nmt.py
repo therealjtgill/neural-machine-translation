@@ -11,8 +11,7 @@ class NMT(object):
                in_vocab_size=30000,
                out_vocab_size=30000,
                save=True,
-               train=True,
-               teacher_forcing=False):
+               train=True):
     '''
     Set up the computation graph.
     '''
@@ -22,9 +21,10 @@ class NMT(object):
 
     with tf.variable_scope("nmt", reuse=False):
       self.saver = None
-      self.input_data_ph   = tf.placeholder(dtype=tf.float32, shape=[None, None, in_vocab_size])
-      self.output_data_ph  = tf.placeholder(dtype=tf.float32, shape=[None, None, out_vocab_size])
-      self.dropout_prob_ph = tf.placeholder(dtype=tf.float32, shape=[])
+      self.input_data_ph   = tf.placeholder(dtype=tf.float32, shape=[None, None, in_vocab_size], name="inputdata")
+      self.output_data_ph  = tf.placeholder(dtype=tf.float32, shape=[None, None, out_vocab_size], name="outputdata")
+      self.dropout_prob_ph = tf.placeholder(dtype=tf.float32, shape=[], name="dropoutprob")
+      self.teacher_forcing_ph = tf.placeholder(dtype=tf.bool, shape=[], name="teacherforce")
 
       self.session = session
 
@@ -85,6 +85,7 @@ class NMT(object):
         num_encoder_nodes*2,
         num_decoder_nodes,
         gru_encoder_states,
+        teacher_forcing=self.teacher_forcing_ph,
         output_vocab_size=out_vocab_size)
       self.gru_dec_dropout = tf.nn.rnn_cell.DropoutWrapper(
         self.gru_dec,
@@ -148,6 +149,7 @@ class NMT(object):
         num_encoder_nodes*2,
         num_decoder_nodes,
         self.encoder_output_ph,
+        teacher_forcing=self.teacher_forcing_ph,
         output_vocab_size=out_vocab_size)
 
       decoder_input_state = list(self.gru_decoder_test.zero_state(1, dtype=tf.float32))
@@ -191,7 +193,8 @@ class NMT(object):
     feeds = {
       self.input_data_ph   : X,
       self.output_data_ph  : y,
-      self.dropout_prob_ph : 0.8
+      self.dropout_prob_ph : 0.8,
+      self.teacher_forcing_ph : True
     }
 
     loss, attention, _ = self.session.run(fetches, feeds)
@@ -213,7 +216,8 @@ class NMT(object):
     feeds = {
       self.input_data_ph   : X,
       self.output_data_ph  : y,
-      self.dropout_prob_ph : 1.0
+      self.dropout_prob_ph : 1.0,
+      self.teacher_forcing_ph : False
     }
 
     loss, predictions, attention = self.session.run(fetches, feeds)
@@ -232,7 +236,9 @@ class NMT(object):
 
     feeds = {
       self.input_data_ph   : X,
-      self.dropout_prob_ph : 1.0
+      self.dropout_prob_ph : 1.0,
+      self.output_data_ph   : np.zeros_like(X),
+      self.teacher_forcing_ph : False
     }
 
     predictions, attention = self.session.run(fetches, feeds)
