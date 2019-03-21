@@ -182,7 +182,7 @@ class NMT(object):
     shape(y) = [batch_size, out_seq_length, out_vocab_size]
     '''
 
-    print("Shape of target output: ", y.shape)
+    #print("Shape of target output: ", y.shape)
 
     fetches = [
       self.loss,

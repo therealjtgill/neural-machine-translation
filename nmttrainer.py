@@ -100,7 +100,6 @@ def main(argv):
       print("That batch was too big, getting another one.")
       new_batch = dh.getTrainBatch(args.batchsize)
     loss, _ = nmt.trainStep(new_batch[0], new_batch[1])
-    print("loss: ", loss)
     if np.isnan(loss):
       print("Found a loss that is nan... exiting.")
       sys.exit(-1)
@@ -119,6 +118,7 @@ def main(argv):
       minutes, seconds = divmod(rem, 60)
       print("Elapsed time: {:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds))
       print("Num epochs: ", curr_epoch_count)
+      print("Loss: ", loss)
     if (i % 500) == 0:
       nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
     i += 1
