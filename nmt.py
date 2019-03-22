@@ -18,6 +18,8 @@ class NMT(object):
     embedding_size        = 640
     num_encoder_nodes     = 1000
     num_decoder_nodes     = 1000
+    self.in_vocab_size = in_vocab_size
+    self.out_vocab_size = out_vocab_size
 
     with tf.variable_scope("nmt", reuse=False):
       self.saver = None
@@ -90,11 +92,11 @@ class NMT(object):
       self.gru_dec_dropout = tf.nn.rnn_cell.DropoutWrapper(
         self.gru_dec,
         output_keep_prob=self.dropout_prob_ph)
-      decoder_initial_state = \
+      self.decoder_initial_state = \
         list(self.gru_dec_dropout.zero_state(batch_size, dtype=tf.float32))
-      print("decoder state: ", decoder_initial_state)
-      decoder_initial_state[0] = decoder_initial_gru_state
-      decoder_initial_state = tuple(decoder_initial_state)
+      print("decoder state: ", self.decoder_initial_state)
+      self.decoder_initial_state[0] = decoder_initial_gru_state
+      self.decoder_initial_state = tuple(self.decoder_initial_state)
       print("state size decoder: ", self.gru_dec_dropout.state_size)
 
       # The decoder output for a single timestep is a tuple of:
@@ -104,12 +106,12 @@ class NMT(object):
           self.gru_dec_dropout,
           self.output_data_ph,
           dtype=tf.float32,
-          initial_state=decoder_initial_state)
+          initial_state=self.decoder_initial_state)
 
       print("gru decoder out: ", self.gru_decoder_out)
       predicted_logits = self.gru_decoder_out[0]
 
-      target_probs_flat     = tf.reshape(
+      target_probs_flat = tf.reshape(
         self.output_data_ph,
         shape=[-1, out_vocab_size])
 
@@ -138,7 +140,6 @@ class NMT(object):
     with tf.variable_scope("nmt", reuse=True):
       print(self.gru_dec_dropout.state_size)
       # The last element of the decoder's state is not used by the decoder, it's just for making pretty attention plots.
-      # Actually... this might not be right. The placeholder needs to be a tuple of matrices.
       self.decoder_gru_input_ph            = tf.placeholder(dtype=tf.float32, shape=(1, self.gru_dec_dropout.state_size[0]))
       self.decoder_prev_softmaxes_input_ph = tf.placeholder(dtype=tf.float32, shape=(1, self.gru_dec_dropout.state_size[1]))
       self.encoder_output_ph               = tf.placeholder(dtype=tf.float32, shape=[1, None, 2*num_encoder_nodes])
@@ -152,14 +153,13 @@ class NMT(object):
         teacher_forcing=self.teacher_forcing_ph,
         output_vocab_size=out_vocab_size)
 
-      decoder_input_state = list(self.gru_decoder_test.zero_state(1, dtype=tf.float32))
+      decoder_input_state    = list(self.gru_decoder_test.zero_state(1, dtype=tf.float32))
       decoder_input_state[0] = self.decoder_gru_input_ph
       decoder_input_state[1] = self.decoder_prev_softmaxes_input_ph
-      decoder_input_state = tuple(decoder_input_state)
+      decoder_input_state    = tuple(decoder_input_state)
       self.gru_decoder_test_out, self.gru_decoder_test_state = \
         tf.nn.dynamic_rnn(
           self.gru_decoder_test,
-          #self.decoder_prev_softmaxes_input_ph,
           fake_decoder_inputs,
           dtype=tf.float32,
           initial_state=decoder_input_state)
@@ -167,12 +167,8 @@ class NMT(object):
       print("gru decoder test out: ", self.gru_decoder_test_out)
       predicted_test_logits = self.gru_decoder_test_out[0]
 
-      predicted_logits_flat = tf.reshape(
-        predicted_logits,
-        shape=[-1, out_vocab_size])
-
-      self.predictions = tf.nn.softmax(predicted_logits, axis=-1)
-      self.attention   = self.gru_decoder_out[1]
+      self.predictions_test = tf.nn.softmax(predicted_test_logits, axis=-1)
+      self.attention_test   = self.gru_decoder_test_out[1]
 
   def trainStep(self, X, y):
     '''
@@ -181,8 +177,6 @@ class NMT(object):
     shape(X) = [batch_size, in_seq_length, in_vocab_size]
     shape(y) = [batch_size, out_seq_length, out_vocab_size]
     '''
-
-    #print("Shape of target output: ", y.shape)
 
     fetches = [
       self.loss,
@@ -235,15 +229,75 @@ class NMT(object):
     ]
 
     feeds = {
-      self.input_data_ph   : X,
-      self.dropout_prob_ph : 1.0,
-      self.output_data_ph   : np.zeros_like(X),
+      self.input_data_ph      : X,
+      self.dropout_prob_ph    : 1.0,
+      self.output_data_ph     : np.zeros_like(X),
       self.teacher_forcing_ph : False
     }
 
     predictions, attention = self.session.run(fetches, feeds)
 
     return predictions, attention
+
+  def getEncoderOutputAndDecoderInput(self, X):
+    '''
+    shape(X) = [1, in_seq_length, in_vocab_size]
+    '''
+
+    fetches = [
+      self.gru_encoder_out,
+      self.decoder_initial_state
+    ]
+
+    feeds = {
+      self.input_data_ph      : X,
+      self.dropout_prob_ph    : 1.0,
+      self.teacher_forcing_ph : False
+    }
+
+    encoder_out, decoder_init_state = self.session.run(fetches, feeds)
+
+    return encoder_out, decoder_init_state
+
+  def predictSingleStep(self, decoder_input, prev_word, encoder_output):
+    '''
+    shape(decoder_input) = [1, gru_size]
+    shape(prev_word) = [1, output_vocab_size]
+    shape(encoder_output) = [1, in_seq_length, 2*gru_size]
+    '''
+    
+    fetches = [
+      self.gru_decoder_test_out,
+      self.gru_decoder_test_state
+    ]
+
+    feeds = {
+      self.decoder_gru_input_ph : decoder_input,
+      self.decoder_prev_softmaxes_input_ph : prev_word,
+      self.encoder_output_ph : encoder_output,
+      self.teacher_forcing_ph  : False
+    }
+
+    print(decoder_input[0].shape)
+    print(prev_word.shape)
+    print(encoder_output[0].shape)
+
+    decoder_out, decoder_state = self.session.run(fetches, feeds)
+
+    return decoder_out, decoder_state
+
+  def beamSearch(self, X):
+
+    encoder_out, decoder_init_state = self.getEncoderOutputAndDecoderInput(X)
+
+    decoder_out, decoder_state = \
+      self.predictSingleStep(
+        decoder_init_state[0],
+        np.zeros((1, self.out_vocab_size)),
+        np.concatenate(encoder_out, axis=-1)
+        )
+
+    return decoder_out, decoder_state
 
   def saveParams(self, save_dir, global_step):
     '''

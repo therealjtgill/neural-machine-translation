@@ -2,6 +2,7 @@ import argparse
 import nmt
 from nmt import NMT
 import numpy as np
+np.set_printoptions(threshold=np.nan)
 import tensorflow as tf
 from tokenconverter import *
 
@@ -60,5 +61,5 @@ if __name__ == "__main__":
   predictions = nmt.predict([input_one_hots])
   print("shape of predictions", predictions[0].shape)
   print(softmaxesToWords(predictions[0][0], tar_tokens_to_words, no_unk=False))
-
+  print(nmt.beamSearch([input_one_hots]))
   print(topKPredictions(predictions[0][0], 5, tar_tokens_to_words))
