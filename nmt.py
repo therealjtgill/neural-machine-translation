@@ -268,36 +268,86 @@ class NMT(object):
     
     fetches = [
       self.gru_decoder_test_out,
-      self.gru_decoder_test_state
+      self.gru_decoder_test_state,
+      self.predictions_test
     ]
 
     feeds = {
       self.decoder_gru_input_ph : decoder_input,
-      self.decoder_prev_softmaxes_input_ph : prev_word,
+      self.decoder_prev_softmaxes_input_ph : np.reshape(prev_word, [1, -1]),
       self.encoder_output_ph : encoder_output,
       self.teacher_forcing_ph  : False
     }
 
-    print(decoder_input[0].shape)
-    print(prev_word.shape)
-    print(encoder_output[0].shape)
+    #print("decoder input shape: ", decoder_input.shape)
+    #print("prev word shape: ", prev_word.shape)
+    #print("encoder output shape: ", encoder_output.shape)
 
-    decoder_out, decoder_state = self.session.run(fetches, feeds)
+    #print(decoder_input[0].shape)
+    #print(prev_word.shape)
+    #print(encoder_output[0].shape)
 
-    return decoder_out, decoder_state
+    decoder_out, decoder_state, prediction = self.session.run(fetches, feeds)
+    #print("prediction shape: ", prediction.shape)
+    return decoder_out, decoder_state, prediction
 
-  def beamSearch(self, X):
+  def softmaxToKHottest(self, softmax, k=5):
+    '''
+    shape(softmax) = [1, 1, vocab_size]
+    Returns a tuple of (index, conditional probability) for the top k predicted
+    words.
+    '''
+
+    top_k_indices = []
+    top_k_probs = []
+
+    rearranged = [(i, p) for i, p in enumerate(softmax)]
+    rearranged = sorted(rearranged, key=(lambda s: s[1]))[::-1]
+    top_k_probs = tuple([t[1] for t in rearranged[:k]])
+    top_k_indices = tuple([t[0] for t in rearranged[:k]])
+    top_k_items = [(w, p) for w, p in zip(top_k_indices, top_k_probs)]
+    return top_k_items
+
+  def softmaxToOnehot(self, softmax):
+    '''
+    shape(softmax) = [1, 1, vocab_size]
+    '''
+
+    one_hot = np.zeros_like(softmax)
+    no_unk_softmax = softmax
+    no_unk_softmax[0, 0, 30000] = 0.0
+    hot_index = softmax[0, 0].argmax()
+    one_hot[0, 0, hot_index] = 1.0
+
+    return one_hot, hot_index
+
+  def greedySearch(self, X):
 
     encoder_out, decoder_init_state = self.getEncoderOutputAndDecoderInput(X)
 
-    decoder_out, decoder_state = \
+    decoder_out, decoder_state, prediction = \
       self.predictSingleStep(
         decoder_init_state[0],
         np.zeros((1, self.out_vocab_size)),
         np.concatenate(encoder_out, axis=-1)
         )
 
-    return decoder_out, decoder_state
+    one_hot, hot_index = self.softmaxToOnehot(prediction)
+    hot_indices = []
+    hot_indices.append(hot_index)
+
+    while 30001 not in hot_indices:
+      decoder_out, decoder_state, prediction = \
+        self.predictSingleStep(
+          decoder_state[0],
+          one_hot,
+          np.concatenate(encoder_out, axis=-1)
+          )
+
+      one_hot, hot_index = self.softmaxToOnehot(prediction)
+      hot_indices.append(hot_index)
+
+    return hot_indices
 
   def saveParams(self, save_dir, global_step):
     '''

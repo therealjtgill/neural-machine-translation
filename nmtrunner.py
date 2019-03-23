@@ -54,12 +54,16 @@ if __name__ == "__main__":
                   for w in input_str.split(" ")]
   print(input_tokens)
   input_one_hots = tokensToOneHots(input_tokens, eng_vocab_size)
-  print(input_one_hots)
+  #print(input_one_hots)
   
   # Actually run the input tokens through the network and get the translation...
 
+  print("string to translate: ", args.stringtotranslate)
   predictions = nmt.predict([input_one_hots])
   print("shape of predictions", predictions[0].shape)
   print(softmaxesToWords(predictions[0][0], tar_tokens_to_words, no_unk=False))
-  print(nmt.beamSearch([input_one_hots]))
+  greedy_hot_indices = nmt.greedySearch([input_one_hots])
+  print("greedy search output: ", greedy_hot_indices)
+  greedy_tokens = [i + 1 for i in greedy_hot_indices]
+  print("greedy translation: ", tokensToWords(greedy_tokens, tar_tokens_to_words))
   print(topKPredictions(predictions[0][0], 5, tar_tokens_to_words))
