@@ -308,7 +308,7 @@ class DataHandler(object):
     if seq_length == None:
       max_line_length = max([len(l.split(" ")) for l in lines]) + 2
     else:
-      max_line_length = seq_length + 1
+      max_line_length = seq_length + 2
     batch_size = len(lines)
     vocab_size = len(vocab)
     one_hots = np.zeros((batch_size, max_line_length, vocab_size))
