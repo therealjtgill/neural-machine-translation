@@ -312,7 +312,7 @@ class DataHandler(object):
     batch_size = len(lines)
     vocab_size = len(vocab)
     one_hots = np.zeros((batch_size, max_line_length, vocab_size))
-    one_hots[:, 1:, vocab_size - 2] = 1.0 # Janky way to end-pad with "<end>" vector
+    #one_hots[:, 1:, vocab_size - 2] = 1.0 # Janky way to end-pad with "<end>" vector
     one_hots[:, 0, vocab_size - 1] = 1.0 # Janky way to front-pad with "<start>" vectors
 
 
@@ -321,9 +321,9 @@ class DataHandler(object):
       #print("line tokens: ", lines[bs], line_tokens)
       for sl in range(len(line_tokens)):
         hot_index = int(line_tokens[sl]) - 1 # Tokens are 1-indexed
-        one_hots[bs, sl + 1, vocab_size - 2] = 0.0
+        #one_hots[bs, sl + 1, vocab_size - 2] = 0.0
         one_hots[bs, sl + 1, hot_index] = 1.0
-      #one_hots[bs, len(line_tokens), vocab_size - 1] = 1.0
+      one_hots[bs, len(line_tokens) + 1, vocab_size - 2] = 1.0
 
     return one_hots
 

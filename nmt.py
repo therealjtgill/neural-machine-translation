@@ -170,7 +170,7 @@ class NMT(object):
       self.predictions_test = tf.nn.softmax(predicted_test_logits, axis=-1)
       self.attention_test   = self.gru_decoder_test_out[1]
 
-  def trainStep(self, X, y):
+  def trainStep(self, X, y, dropout_keep_prob=0.8, teacher_forcing=True):
     '''
     Takes input and target output and performs one gradient update to the
     network weights.
@@ -187,8 +187,8 @@ class NMT(object):
     feeds = {
       self.input_data_ph   : X,
       self.output_data_ph  : y,
-      self.dropout_prob_ph : 0.8,
-      self.teacher_forcing_ph : True
+      self.dropout_prob_ph : dropout_keep_prob,
+      self.teacher_forcing_ph : teacher_forcing
     }
 
     loss, attention, _ = self.session.run(fetches, feeds)

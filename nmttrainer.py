@@ -99,7 +99,7 @@ def main(argv):
     while new_batch[0].shape[1] > args.maxlinelength:
       print("That batch was too big, getting another one.")
       new_batch = dh.getTrainBatch(args.batchsize)
-    loss, _ = nmt.trainStep(new_batch[0], new_batch[1])
+    loss, _ = nmt.trainStep(new_batch[0], new_batch[1], 0.80, True)
     if np.isnan(loss):
       print("Found a loss that is nan... exiting.")
       sys.exit(-1)
