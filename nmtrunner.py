@@ -5,6 +5,7 @@ import numpy as np
 np.set_printoptions(threshold=np.nan)
 import tensorflow as tf
 from tokenconverter import *
+from utils import *
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Opens up the saved weights for \
@@ -61,9 +62,11 @@ if __name__ == "__main__":
   print("string to translate: ", args.stringtotranslate)
   predictions = nmt.predict([input_one_hots])
   print("shape of predictions", predictions[0].shape)
-  print(softmaxesToWords(predictions[0][0], tar_tokens_to_words, no_unk=False))
+  predicted_words = softmaxesToWords(predictions[0][0], tar_tokens_to_words, no_unk=False)
+  print(predicted_words)
   greedy_hot_indices = nmt.greedySearch([input_one_hots])
   print("greedy search output: ", greedy_hot_indices)
   greedy_tokens = [i + 1 for i in greedy_hot_indices]
   print("greedy translation: ", tokensToWords(greedy_tokens, tar_tokens_to_words))
   print(topKPredictions(predictions[0][0], 5, tar_tokens_to_words))
+  plotAttentionMatrix(predictions[1][0], ".", input_str.split(), predicted_words.split())

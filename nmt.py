@@ -316,7 +316,7 @@ class NMT(object):
     one_hot = np.zeros_like(softmax)
     no_unk_softmax = softmax
     no_unk_softmax[0, 0, 30000] = 0.0
-    hot_index = softmax[0, 0].argmax()
+    hot_index = no_unk_softmax[0, 0].argmax()
     one_hot[0, 0, hot_index] = 1.0
 
     return one_hot, hot_index
