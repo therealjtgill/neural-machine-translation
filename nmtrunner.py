@@ -3,6 +3,7 @@ import nmt
 from nmt import NMT
 import numpy as np
 np.set_printoptions(threshold=np.nan)
+import os
 import tensorflow as tf
 from tokenconverter import *
 from utils import *
@@ -30,9 +31,17 @@ if __name__ == "__main__":
     required    = True,
     default     = None,
     help        = "The string that will be translated into the target language.")
+
+  parser.add_argument("--usecpu",
+    required    = False,
+    default     = False,
+    action      = 'store_true',
+    help        = "Boolean flag indicating that the computation graph should be executed on the CPU.")
   
   args = parser.parse_args()
-  sess = tf.Session()
+  if args.usecpu:
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+  sess = sess = tf.Session()
   sess.run(tf.global_variables_initializer())
   # load JSON from dictionary...
   d1 = open(args.englishdict)
@@ -50,7 +59,7 @@ if __name__ == "__main__":
   nmt = NMT(sess, in_vocab_size=eng_vocab_size, out_vocab_size=tar_vocab_size, train=False)
   nmt.loadParams(args.loadconfig)
 
-  input_str = args.stringtotranslate.strip().replace(".", "")
+  input_str = args.stringtotranslate.strip()
   input_tokens = [eng_words_to_tokens[w] if w in eng_words_to_tokens else eng_words_to_tokens["<unk>"]
                   for w in input_str.split(" ")]
   print(input_tokens)

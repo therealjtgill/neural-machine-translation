@@ -72,7 +72,7 @@ def main(argv):
     required    = False,
     default     = False,
     action      = 'store_true',
-    help        = "The maximum sequence length of a batch retrieved from the dataset.")
+    help        = "Boolean indicating that a \"<start>\" token should be at the beginning of translated strings.")
 
   args = parser.parse_args()
 
