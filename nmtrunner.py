@@ -55,7 +55,9 @@ if __name__ == "__main__":
                   for w in input_str.split(" ")]
   print(input_tokens)
   input_one_hots = tokensToOneHots(input_tokens, eng_vocab_size)
-  #print(input_one_hots)
+  print("input one hots shape: ", input_one_hots.shape)
+  input_hots = [a.argmax() for a in input_one_hots]
+  print("hot indices: ", input_hots)
   
   # Actually run the input tokens through the network and get the translation...
 

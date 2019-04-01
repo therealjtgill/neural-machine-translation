@@ -9,6 +9,7 @@ import sys
 import tensorflow as tf
 import time
 from tokenizedloader import DataHandler
+from utils import *
 
 def saveAttention(att, save_dir, offset, suffix=""):
   #np.savetxt(os.path.join(save_dir, "attention" + str(offset) + suffix + ".dat"), att, fmt="%f")
@@ -47,7 +48,6 @@ def main(argv):
 
   parser.add_argument("-b", "--batchsize",
     required    = False,
-    #default     = 30,
     default     = 80,
     help        = "The size of the training batches to use.")
 
@@ -68,9 +68,15 @@ def main(argv):
     type        = int,
     help        = "The maximum sequence length of a batch retrieved from the dataset.")
 
+  parser.add_argument("--starttokenonoutput",
+    required    = False,
+    default     = False,
+    action      = 'store_true',
+    help        = "The maximum sequence length of a batch retrieved from the dataset.")
+
   args = parser.parse_args()
 
-  dh = DataHandler(args.englishtext, args.englishdict, args.targettext, args.targetdict)
+  dh = DataHandler(args.englishtext, args.englishdict, args.targettext, args.targetdict, output_has_start_token=args.starttokenonoutput)
   sess = tf.Session()
   nmt = NMT(sess, in_vocab_size=dh.vocab_sizes[0], out_vocab_size=dh.vocab_sizes[1])
   sess.run(tf.global_variables_initializer())
@@ -88,7 +94,7 @@ def main(argv):
 
   start_time = time.time()
   prev_epoch_count = dh.num_epochs_elapsed
-  #for i in range(120000):
+
   i = 0
   while (dh.num_epochs_elapsed < args.numepochs):
     curr_epoch_count = dh.num_epochs_elapsed
@@ -107,12 +113,20 @@ def main(argv):
     if (i % 50) == 0:
       predictions, attention = nmt.predict(new_batch[0])
       saveTranslation(new_batch[0], new_batch[1], predictions, save_dir, i, "_train", dh)
-      saveAttention(attention[-1], save_dir, i, suffix="_train")
+      english_labels = dh.oneHotsToWords(new_batch[0][-1], dh.dict_token_to_word_langs[0])
+      french_labels = dh.softmaxesToWords(predictions[-1], dh.dict_token_to_word_langs[1], no_unk=False)
+      #saveAttention(attention[-1], save_dir, i, suffix="_train")
+      saveAttentionMatrix(attention[-1], save_dir, i, english_labels.split(), french_labels.split(), suffix="_train")
+
       valid_batch = dh.getValidateBatch(1)
       predictions, attention = nmt.predict(valid_batch[0])
-      print("shape of predictions: ", predictions.shape)
+      #print("shape of predictions: ", predictions.shape)
       saveTranslation(valid_batch[0], valid_batch[1], predictions, save_dir, i, "", dh)
-      saveAttention(attention[-1], save_dir, i)
+      english_labels_valid = dh.oneHotsToWords(valid_batch[0][-1], dh.dict_token_to_word_langs[0])
+      french_labels_valid = dh.softmaxesToWords(predictions[-1], dh.dict_token_to_word_langs[1], no_unk=False)
+      #saveAttention(attention[-1], save_dir, i)
+      saveAttentionMatrix(attention[-1], save_dir, i, english_labels_valid.split(), french_labels_valid.split())
+      
       current_time = time.time()
       hours, rem = divmod(current_time - start_time, 3600)
       minutes, seconds = divmod(rem, 60)
