@@ -11,7 +11,7 @@ import sys
 
 class DataHandler(object):
 
-  def __init__(self, file_language_1, dict_language_1, file_language_2, dict_language_2):
+  def __init__(self, file_language_1, dict_language_1, file_language_2, dict_language_2, output_has_start_token=True):
     '''
     The dictionaries map words to tokens in a 1:1 relationship.
     The language files are sentence-aligned between the two languages. There is
@@ -19,6 +19,7 @@ class DataHandler(object):
     '''
     self.file_langs = (file_language_1, file_language_2)
     self.dict_word_to_token_langs = [None, None]
+    self._output_has_start_token = output_has_start_token
 
     with open(dict_language_1, "r") as d1:
       self.dict_word_to_token_langs[0] = json.load(d1)
@@ -295,7 +296,7 @@ class DataHandler(object):
   def getValidateBatch(self, batch_size):
     return self.getBatch(batch_size, source="validate")
 
-  def rawTextToOneHots(self, lines, vocab, seq_length=None):
+  def rawTextToOneHots(self, lines, vocab, seq_length=None, use_start=True):
     '''
     Expects lines to be an array of strings, with token characters delimited by
     spaces. So lines[i].split(" ") provides token numbers of the words in the
@@ -303,7 +304,7 @@ class DataHandler(object):
     Expects vocab to be a dictionary of words to token numbers. It also expects
     that the <end> tag is the last token in the dictionary (numerically).
     '''
-    # Need to add a single "<start>" to the front of the string
+
     max_line_length = 0
     if seq_length == None:
       max_line_length = max([len(l.split(" ")) for l in lines]) + 2
@@ -313,8 +314,10 @@ class DataHandler(object):
     vocab_size = len(vocab)
     one_hots = np.zeros((batch_size, max_line_length, vocab_size))
     #one_hots[:, 1:, vocab_size - 2] = 1.0 # Janky way to end-pad with "<end>" vector
-    one_hots[:, 0, vocab_size - 1] = 1.0 # Janky way to front-pad with "<start>" vectors
-
+    token_position_shift = 0
+    if use_start:
+      one_hots[:, 0, vocab_size - 1] = 1.0 # Janky way to front-pad with "<start>" vectors
+      token_position_shift = 1
 
     for bs in range(batch_size):
       line_tokens = lines[bs].strip().split(" ")
@@ -322,7 +325,7 @@ class DataHandler(object):
       for sl in range(len(line_tokens)):
         hot_index = int(line_tokens[sl]) - 1 # Tokens are 1-indexed
         #one_hots[bs, sl + 1, vocab_size - 2] = 0.0
-        one_hots[bs, sl + 1, hot_index] = 1.0
+        one_hots[bs, sl + token_position_shift, hot_index] = 1.0
       one_hots[bs, len(line_tokens) + 1, vocab_size - 2] = 1.0
 
     return one_hots
@@ -481,16 +484,19 @@ class DataHandler(object):
     max_line_lengths = []
     max_line_lengths.append(max([len(l.split(" ")) for l in batch_lines[0]]) + 1)
     max_line_lengths.append(max([len(l.split(" ")) for l in batch_lines[1]]) + 1)
-    # TODO: sort the elements of batch_lines by english-sentence length.
+
     batch_lengths = [(i, len(l.split(" "))) for i, l in enumerate(batch_lines[0])]
     length_sorted_batch_indices = sorted(batch_lengths, key=(lambda s: s[1]))
     #print("length sorted batch indices: ", length_sorted_batch_indices)
     batch_lines_sorted = [None, None]
     for i in range(len(batch_lines)):
       batch_lines_sorted[i] = [batch_lines[i][j[0]] for j in length_sorted_batch_indices]
-    #for i, bstring in enumerate(batch_lines):
+
     for i, bstring in enumerate(batch_lines_sorted):
-      batch[i] = self.rawTextToOneHots(bstring, self.dict_word_to_token_langs[i], max(max_line_lengths))
+      use_start = True
+      if i == 1:
+        use_start = self._output_has_start_token
+      batch[i] = self.rawTextToOneHots(bstring, self.dict_word_to_token_langs[i], max(max_line_lengths), use_start)
     return batch
 
 def main(argv):

@@ -8,7 +8,7 @@ def tokensToOneHots(tokens, vocab_size):
   The vocabulary size must be provided to ensure that the one-hot vectors have
   the correct length.
   '''
-  one_hots = np.zeros((len(tokens), vocab_size))
+  one_hots = np.zeros((len(tokens) + 3, vocab_size))
   for i, t in enumerate(tokens):
     one_hots[i, t - 1] = 1.0
   return one_hots
