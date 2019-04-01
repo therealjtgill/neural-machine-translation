@@ -279,17 +279,16 @@ class NMT(object):
       self.teacher_forcing_ph  : False
     }
 
-    #print("decoder input shape: ", decoder_input.shape)
-    #print("prev word shape: ", prev_word.shape)
-    #print("encoder output shape: ", encoder_output.shape)
-
-    #print(decoder_input[0].shape)
-    #print(prev_word.shape)
-    #print(encoder_output[0].shape)
-
     decoder_out, decoder_state, prediction = self.session.run(fetches, feeds)
-    #print("prediction shape: ", prediction.shape)
     return decoder_out, decoder_state, prediction
+
+  def predictSingleStepTopK(self, decoder_input, prev_word, encoder_output):
+    decoder_out, decoder_state, prediction = \
+      self.predictSingleStep(decoder_input, prev_word, encoder_output)
+
+    top_k_items = self.softmaxToKHottest(self, softmax)
+
+    return decoder_out, decoder_state, top_k_items
 
   def softmaxToKHottest(self, softmax, k=5):
     '''
@@ -321,7 +320,7 @@ class NMT(object):
 
     return one_hot, hot_index
 
-  def greedySearch(self, X):
+  def greedySearch(self, X, stop_token=30001):
 
     encoder_out, decoder_init_state = self.getEncoderOutputAndDecoderInput(X)
 
@@ -336,7 +335,7 @@ class NMT(object):
     hot_indices = []
     hot_indices.append(hot_index)
 
-    while 30001 not in hot_indices:
+    while stop_token not in hot_indices:
       decoder_out, decoder_state, prediction = \
         self.predictSingleStep(
           decoder_state[0],
