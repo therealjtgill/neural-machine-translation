@@ -124,7 +124,7 @@ class DecoderCell(RNNCell):
       shape=[self._output_vocab_size],
       initializer=init_ops.random_normal_initializer(stddev=0.01))
 
-    # Shape = [batch_size, in_seq_length, 512]]
+    # Shape = [batch_size, in_seq_length, 1024]]
     self._precomputed = tf.einsum("bti,if->btf", self._encoder_output, self.U_a)
 
   @property
@@ -143,9 +143,6 @@ class DecoderCell(RNNCell):
     '''
     #return self._output_vocab_size
     return self._output_size
-
-  def get_embedding(self, softmax):
-    return tf.matmul(softmax, self.E)
 
   def __call__(self, inputs, state, scope=None):
     '''
@@ -183,8 +180,11 @@ class DecoderCell(RNNCell):
       print("state_true: ", state_true)
       gru_out, gru_state = self._gru_cell(array_ops.concat([context, y_prev], axis=-1), state_true)
 
-      p = math_ops.matmul(gru_out, self.U_p) + math_ops.matmul(y_prev, self.V_p) + math_ops.matmul(context, self.C_p) + self.b_p
-      q = math_ops.matmul(gru_out, self.U_q) + math_ops.matmul(y_prev, self.V_q) + math_ops.matmul(context, self.C_q) + self.b_q
+      #p = math_ops.matmul(gru_out, self.U_p) + math_ops.matmul(y_prev, self.V_p) + math_ops.matmul(context, self.C_p) + self.b_p
+      #q = math_ops.matmul(gru_out, self.U_q) + math_ops.matmul(y_prev, self.V_q) + math_ops.matmul(context, self.C_q) + self.b_q
+
+      p = math_ops.matmul(state_true, self.U_p) + math_ops.matmul(y_prev, self.V_p) + math_ops.matmul(context, self.C_p) + self.b_p
+      q = math_ops.matmul(state_true, self.U_q) + math_ops.matmul(y_prev, self.V_q) + math_ops.matmul(context, self.C_q) + self.b_q
 
       print("p: ", p)
       print("q: ", q)
