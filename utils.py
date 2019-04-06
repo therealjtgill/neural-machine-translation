@@ -34,7 +34,7 @@ def plotAttentionMatrix(attention, save_dir, english_labels, target_labels, file
   plt.xlabel("English words")
   plt.ylabel("Target words")
   ax.xaxis.tick_top()
-  plt.imshow(attention, interpolation="nearest", aspect=1, cmap="gray")
+  plt.imshow(attention, interpolation="nearest", aspect=1, cmap="gray", vmax=1.0, vmin=0.0)
   plt.show()
   plt.close()
 
