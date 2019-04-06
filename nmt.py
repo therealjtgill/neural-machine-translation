@@ -135,7 +135,7 @@ class NMT(object):
         self.train_op = optimizer.apply_gradients(capped_grads)
 
       if save:
-        self.saver = tf.train.Saver(max_to_keep=20)
+        self.saver = tf.train.Saver(max_to_keep=5)
 
     with tf.variable_scope("nmt", reuse=True):
       print(self.gru_dec_dropout.state_size)
@@ -269,7 +269,8 @@ class NMT(object):
     fetches = [
       self.gru_decoder_test_out,
       self.gru_decoder_test_state,
-      self.predictions_test
+      self.predictions_test,
+      self.attention_test
     ]
 
     feeds = {
@@ -279,8 +280,17 @@ class NMT(object):
       self.teacher_forcing_ph  : False
     }
 
-    decoder_out, decoder_state, prediction = self.session.run(fetches, feeds)
-    return decoder_out, decoder_state, prediction
+    #print("decoder input shape: ", decoder_input.shape)
+    #print("prev word shape: ", prev_word.shape)
+    #print("encoder output shape: ", encoder_output.shape)
+
+    #print(decoder_input[0].shape)
+    #print(prev_word.shape)
+    #print(encoder_output[0].shape)
+
+    decoder_out, decoder_state, prediction, attention = self.session.run(fetches, feeds)
+    #print("prediction shape: ", prediction.shape)
+    return decoder_out, decoder_state, prediction, attention
 
   def predictSingleStepTopK(self, decoder_input, prev_word, encoder_output):
     decoder_out, decoder_state, prediction = \
@@ -315,7 +325,8 @@ class NMT(object):
     one_hot = np.zeros_like(softmax)
     no_unk_softmax = softmax
     no_unk_softmax[0, 0, 30000] = 0.0
-    hot_index = no_unk_softmax[0, 0].argmax()
+    #hot_index = no_unk_softmax[0, 0].argmax()
+    hot_index = softmax[0, 0].argmax()
     one_hot[0, 0, hot_index] = 1.0
 
     return one_hot, hot_index
@@ -324,7 +335,7 @@ class NMT(object):
 
     encoder_out, decoder_init_state = self.getEncoderOutputAndDecoderInput(X)
 
-    decoder_out, decoder_state, prediction = \
+    decoder_out, decoder_state, prediction, attention = \
       self.predictSingleStep(
         decoder_init_state[0],
         np.zeros((1, self.out_vocab_size)),
@@ -334,6 +345,8 @@ class NMT(object):
     one_hot, hot_index = self.softmaxToOnehot(prediction)
     hot_indices = []
     hot_indices.append(hot_index)
+    attentions = []
+    attentions.append(attention)
 
     while stop_token not in hot_indices:
       decoder_out, decoder_state, prediction = \
@@ -345,8 +358,11 @@ class NMT(object):
 
       one_hot, hot_index = self.softmaxToOnehot(prediction)
       hot_indices.append(hot_index)
+      attentions.append(attention)
 
-    return hot_indices
+    print("attention shape: ", attentions[0].shape)
+
+    return hot_indices, np.squeeze(np.concatenate(attentions, axis=1))
 
   def saveParams(self, save_dir, global_step):
     '''
