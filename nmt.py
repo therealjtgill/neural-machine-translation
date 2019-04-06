@@ -292,6 +292,14 @@ class NMT(object):
     #print("prediction shape: ", prediction.shape)
     return decoder_out, decoder_state, prediction, attention
 
+  def predictSingleStepTopK(self, decoder_input, prev_word, encoder_output):
+    decoder_out, decoder_state, prediction = \
+      self.predictSingleStep(decoder_input, prev_word, encoder_output)
+
+    top_k_items = self.softmaxToKHottest(self, softmax)
+
+    return decoder_out, decoder_state, top_k_items
+
   def softmaxToKHottest(self, softmax, k=5):
     '''
     shape(softmax) = [1, 1, vocab_size]
@@ -323,7 +331,7 @@ class NMT(object):
 
     return one_hot, hot_index
 
-  def greedySearch(self, X):
+  def greedySearch(self, X, stop_token=30001):
 
     encoder_out, decoder_init_state = self.getEncoderOutputAndDecoderInput(X)
 
@@ -340,8 +348,8 @@ class NMT(object):
     attentions = []
     attentions.append(attention)
 
-    while 30001 not in hot_indices:
-      decoder_out, decoder_state, prediction, attention = \
+    while stop_token not in hot_indices:
+      decoder_out, decoder_state, prediction = \
         self.predictSingleStep(
           decoder_state[0],
           one_hot,
