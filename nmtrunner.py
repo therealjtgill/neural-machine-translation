@@ -74,10 +74,13 @@ if __name__ == "__main__":
   predictions = nmt.predict([input_one_hots])
   print("shape of predictions", predictions[0].shape)
   predicted_words = softmaxesToWords(predictions[0][0], tar_tokens_to_words, no_unk=False)
-  print(predicted_words)
-  greedy_hot_indices = nmt.greedySearch([input_one_hots])
+  print(" ".join(predicted_words))
+  greedy_hot_indices, greedy_attention = nmt.greedySearch([input_one_hots])
   print("greedy search output: ", greedy_hot_indices)
   greedy_tokens = [i + 1 for i in greedy_hot_indices]
-  print("greedy translation: ", tokensToWords(greedy_tokens, tar_tokens_to_words))
+  greedy_words = tokensToWords(greedy_tokens, tar_tokens_to_words)
+  print("greedy translation: ", greedy_words)
+  
   print(topKPredictions(predictions[0][0], 5, tar_tokens_to_words))
-  plotAttentionMatrix(predictions[1][0], ".", input_str.split(), predicted_words.split())
+  plotAttentionMatrix(predictions[1][0], ".", input_str.split(), predicted_words)
+  plotAttentionMatrix(greedy_attention, ".", input_str.split(), greedy_words)

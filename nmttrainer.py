@@ -74,6 +74,18 @@ def main(argv):
     action      = 'store_true',
     help        = "Boolean indicating that a \"<start>\" token should be at the beginning of translated strings.")
 
+  parser.add_argument("-tf", "--teacherforcing",
+    required    = False,
+    default     = False,
+    action      = 'store_true',
+    help        = "Indicates whether or not teacher forcing should be used during training.")
+
+  parser.add_argument("-kp", "--dropoutkeepprob",
+    required    = False,
+    default     = 0.8,
+    type        = float,
+    help        = "The dropout keep probability to use in recurrent layers of the network during training.")
+
   args = parser.parse_args()
 
   dh = DataHandler(args.englishtext, args.englishdict, args.targettext, args.targetdict, output_has_start_token=args.starttokenonoutput)
@@ -105,7 +117,7 @@ def main(argv):
     while new_batch[0].shape[1] > args.maxlinelength:
       print("That batch was too big, getting another one.")
       new_batch = dh.getTrainBatch(args.batchsize)
-    loss, _ = nmt.trainStep(new_batch[0], new_batch[1], 0.80, True)
+    loss, _ = nmt.trainStep(new_batch[0], new_batch[1], args.dropoutkeepprob, args.teacherforcing)
     if np.isnan(loss):
       print("Found a loss that is nan... exiting.")
       sys.exit(-1)
