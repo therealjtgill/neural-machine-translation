@@ -11,7 +11,7 @@ import sys
 
 class DataHandler(object):
 
-  def __init__(self, file_language_1, dict_language_1, file_language_2, dict_language_2, output_has_start_token=True):
+  def __init__(self, file_language_1, dict_language_1, file_language_2, dict_language_2, output_has_start_token=True, input_has_start_token=True):
     '''
     The dictionaries map words to tokens in a 1:1 relationship.
     The language files are sentence-aligned between the two languages. There is
@@ -20,6 +20,7 @@ class DataHandler(object):
     self.file_langs = (file_language_1, file_language_2)
     self.dict_word_to_token_langs = [None, None]
     self._output_has_start_token = output_has_start_token
+    self._input_has_start_token = input_has_start_token
 
     with open(dict_language_1, "r") as d1:
       self.dict_word_to_token_langs[0] = json.load(d1)
@@ -240,6 +241,17 @@ class DataHandler(object):
 
     return " ".join(words)
 
+  def oneHotsToTokens(self, one_hots):
+    '''
+    Expects a matrix, or a vector of one-hot vectors.
+    '''
+
+    tokens = []
+    for i in range(len(one_hots)):
+      tokens.append(one_hots[i].argmax() + 1)
+
+    return tokens
+
   def oneHotsToWords(self, one_hots, dictionary, no_unk=True):
     '''
     Expects one_hots to be a numpy array with rows of one-hot values and
@@ -253,7 +265,7 @@ class DataHandler(object):
         continue
       token = np.squeeze(oh.argmax()) + 1
       tokens.append(int(token))
-    return self.tokensToWords(tokens, dictionary)
+    return self.tokensToWords(tokens, dictionary, no_unk)
 
   def softmaxesToWords(self, softmaxes, dictionary, no_unk=True):
     '''
@@ -313,7 +325,7 @@ class DataHandler(object):
     batch_size = len(lines)
     vocab_size = len(vocab)
     one_hots = np.zeros((batch_size, max_line_length, vocab_size))
-    #one_hots[:, 1:, vocab_size - 2] = 1.0 # Janky way to end-pad with "<end>" vector
+    one_hots[:, 1:, vocab_size - 2] = 1.0 # Janky way to end-pad with "<end>" vector
     token_position_shift = 0
     if use_start:
       one_hots[:, 0, vocab_size - 1] = 1.0 # Janky way to front-pad with "<start>" vectors
@@ -324,9 +336,12 @@ class DataHandler(object):
       #print("line tokens: ", lines[bs], line_tokens)
       for sl in range(len(line_tokens)):
         hot_index = int(line_tokens[sl]) - 1 # Tokens are 1-indexed
-        #one_hots[bs, sl + 1, vocab_size - 2] = 0.0
+        one_hots[bs, sl + token_position_shift, vocab_size - 2] = 0.0
         one_hots[bs, sl + token_position_shift, hot_index] = 1.0
-      one_hots[bs, len(line_tokens) + 1, vocab_size - 2] = 1.0
+      if use_start:
+        one_hots[bs, len(line_tokens) + 1, vocab_size - 2] = 1.0
+      else:
+        one_hots[bs, len(line_tokens), vocab_size - 2] = 1.0
 
     return one_hots
 
@@ -494,6 +509,8 @@ class DataHandler(object):
 
     for i, bstring in enumerate(batch_lines_sorted):
       use_start = True
+      if i == 0:
+        use_start = self._input_has_start_token
       if i == 1:
         use_start = self._output_has_start_token
       batch[i] = self.rawTextToOneHots(bstring, self.dict_word_to_token_langs[i], max(max_line_lengths), use_start)
@@ -548,7 +565,7 @@ def main(argv):
     print("Couldn't find dictionary file: ", args.dict2)
     sys.exit(-1)
 
-  dh = DataHandler(args.language1, args.dict1, args.language2, args.dict2)
+  dh = DataHandler(args.language1, args.dict1, args.language2, args.dict2, False, False)
   draw_times = []
   start_time = 0
   end_time = 0
@@ -559,11 +576,16 @@ def main(argv):
     batch2 = dh.getTestBatch(64)
     print(batch1[0].shape, batch1[1].shape)
     print()
-    print(dh.oneHotsToWords(batch1[0][0], dh.dict_token_to_word_langs[0]))
-    print(dh.oneHotsToWords(batch1[1][0], dh.dict_token_to_word_langs[1]))
+    print(dh.oneHotsToWords(batch1[0][0], dh.dict_token_to_word_langs[0], no_unk=False))
+    print(dh.oneHotsToTokens(batch1[0][0]))
+    print(dh.oneHotsToWords(batch1[1][0], dh.dict_token_to_word_langs[1], no_unk=False))
+    print(dh.oneHotsToTokens(batch1[1][0]))
     print()
-    print(dh.oneHotsToWords(batch2[0][0], dh.dict_token_to_word_langs[0]))
-    print(dh.oneHotsToWords(batch2[1][0], dh.dict_token_to_word_langs[1]))
+    print(dh.oneHotsToWords(batch2[0][0], dh.dict_token_to_word_langs[0], no_unk=False))
+    print(dh.oneHotsToTokens(batch2[0][0]))
+    print(dh.oneHotsToWords(batch2[1][0], dh.dict_token_to_word_langs[1], no_unk=False))
+    print(dh.oneHotsToTokens(batch2[1][0]))
+    print("\nend loop\n")
     diff = end_time - start_time
     draw_times.append(diff.seconds)
     print("That batch took ", diff.seconds, " seconds to be drawn.")
