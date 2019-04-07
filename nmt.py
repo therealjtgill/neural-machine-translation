@@ -296,7 +296,7 @@ class NMT(object):
     decoder_out, decoder_state, prediction = \
       self.predictSingleStep(decoder_input, prev_word, encoder_output)
 
-    top_k_items = self.softmaxToKHottest(self, softmax)
+    top_k_items = self.softmaxToKHottest(self, prediction)
 
     return decoder_out, decoder_state, top_k_items
 
