@@ -349,7 +349,7 @@ class NMT(object):
     attentions.append(attention)
 
     while stop_token not in hot_indices:
-      decoder_out, decoder_state, prediction = \
+      decoder_out, decoder_state, prediction, attention = \
         self.predictSingleStep(
           decoder_state[0],
           one_hot,
