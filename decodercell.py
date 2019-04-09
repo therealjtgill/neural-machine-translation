@@ -165,7 +165,8 @@ class DecoderCell(RNNCell):
       y_prev = math_ops.matmul(state[1], self.E)
 
       # Shape = [batch_size, in_seq_length, 512]]
-      attention_d = tf.nn.tanh(tf.expand_dims(tf.matmul(state_true, self.W_a) + self.bw_a, axis=1) + self._precomputed)
+      #attention_d = tf.nn.tanh(tf.expand_dims(tf.matmul(state_true, self.W_a) + self.bw_a, axis=1) + self._precomputed)
+      attention_d = tf.nn.tanh(tf.expand_dims(tf.matmul(state_true, self.W_a), axis=1) + self._precomputed)
       print("attention_d: ", attention_d)
       # Shape = [batch_size, in_seq_length]
       attention_e = tf.einsum("i,bti->bt", self.v_a, attention_d)
@@ -180,14 +181,17 @@ class DecoderCell(RNNCell):
       print("state_true: ", state_true)
       gru_out, gru_state = self._gru_cell(array_ops.concat([context, y_prev], axis=-1), state_true)
 
-      p = math_ops.matmul(state_true, self.U_p) + math_ops.matmul(y_prev, self.V_p) + math_ops.matmul(context, self.C_p) + self.b_p
-      q = math_ops.matmul(state_true, self.U_q) + math_ops.matmul(y_prev, self.V_q) + math_ops.matmul(context, self.C_q) + self.b_q
+      #p = math_ops.matmul(state_true, self.U_p) + math_ops.matmul(y_prev, self.V_p) + math_ops.matmul(context, self.C_p) + self.b_p
+      p = math_ops.matmul(state_true, self.U_p) + math_ops.matmul(y_prev, self.V_p) + math_ops.matmul(context, self.C_p)
+      #q = math_ops.matmul(state_true, self.U_q) + math_ops.matmul(y_prev, self.V_q) + math_ops.matmul(context, self.C_q) + self.b_q
+      q = math_ops.matmul(state_true, self.U_q) + math_ops.matmul(y_prev, self.V_q) + math_ops.matmul(context, self.C_q)
 
       print("p: ", p)
       print("q: ", q)
 
       t = gen_math_ops.maximum(p, q)
-      out_logits = math_ops.matmul(t, self.W_o) + self.bw_o
+      #out_logits = math_ops.matmul(t, self.W_o) + self.bw_o
+      out_logits = math_ops.matmul(t, self.W_o)
 
       output = (out_logits, alpha)
 

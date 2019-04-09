@@ -48,7 +48,8 @@ class NMT(object):
         initializer=tf.initializers.random_normal(stddev=0.01))
 
       input_2d = tf.reshape(self.input_data_ph, [-1, in_vocab_size])
-      embedded_input_2d = tf.nn.relu(tf.matmul(input_2d, self.W_in_embed) + self.bw_in_embed)
+      #embedded_input_2d = tf.nn.relu(tf.matmul(input_2d, self.W_in_embed) + self.bw_in_embed)
+      embedded_input_2d = tf.matmul(input_2d, self.W_in_embed)
       embedded_input_3d = tf.reshape(embedded_input_2d, [batch_size, seq_length_enc, embedding_size])
 
       # Using GRUs because their outputs are the same as their hidden states,
@@ -81,12 +82,12 @@ class NMT(object):
       decoder_initial_gru_state = \
         tf.nn.tanh(tf.matmul(self.gru_encoder_out[1][:, 0, :], W_decoder_init))
       print("decoder initial state: ", decoder_initial_gru_state)
-      gru_encoder_states = tf.concat(self.gru_encoder_out, axis=-1)
+      self.gru_encoder_states = tf.concat(self.gru_encoder_out, axis=-1)
 
       self.gru_dec = DecoderCell(
         num_encoder_nodes*2,
         num_decoder_nodes,
-        gru_encoder_states,
+        self.gru_encoder_states,
         teacher_forcing=self.teacher_forcing_ph,
         output_vocab_size=out_vocab_size)
       self.gru_dec_dropout = tf.nn.rnn_cell.DropoutWrapper(
