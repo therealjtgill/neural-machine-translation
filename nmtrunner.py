@@ -81,6 +81,7 @@ if __name__ == "__main__":
   greedy_words = tokensToWords(greedy_tokens, tar_tokens_to_words)
   print("greedy translation: ", greedy_words)
   
-  print(topKPredictions(predictions[0][0], 5, tar_tokens_to_words))
+  for topk in topKPredictions(predictions[0][0], 5, tar_tokens_to_words):
+    print(topk)
   plotAttentionMatrix(predictions[1][0], ".", input_str.split(), predicted_words)
   plotAttentionMatrix(greedy_attention, ".", input_str.split(), greedy_words)

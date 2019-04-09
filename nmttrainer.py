@@ -113,18 +113,21 @@ def main(argv):
   start_time = time.time()
   prev_epoch_count = dh.num_epochs_elapsed
 
+  repeated_batch = dh.getValidateBatch(1)
+  while repeated_batch[1].shape[1] < 15:
+    repeated_batch = dh.getValidateBatch(1)
+
   i = 0
   while (dh.num_epochs_elapsed < args.numepochs):
     curr_epoch_count = dh.num_epochs_elapsed
-    if prev_epoch_count > curr_epoch_count:
+    if prev_epoch_count < curr_epoch_count:
       print("\n\n\n       new epoch!        \n\n\n", curr_epoch_count)
       prev_epoch_count = dh.num_epochs_elapsed
     new_batch = dh.getTrainBatch(args.batchsize)
     while new_batch[0].shape[1] > args.maxlinelength:
-      print("That batch was too big, getting another one.")
+      #print("That batch was too big, getting another one.")
       new_batch = dh.getTrainBatch(args.batchsize)
-    teacher_forcing = ((i % 10) == 0)
-    loss, _ = nmt.trainStep(new_batch[0], new_batch[1], args.dropoutkeepprob, teacher_forcing)
+    loss, _ = nmt.trainStep(new_batch[0], new_batch[1], args.dropoutkeepprob, args.teacherforcing)
     if np.isnan(loss):
       print("Found a loss that is nan... exiting.")
       sys.exit(-1)
@@ -145,7 +148,16 @@ def main(argv):
       french_labels_valid = dh.softmaxesToWords(predictions[-1], dh.dict_token_to_word_langs[1], no_unk=False)
       #saveAttention(attention[-1], save_dir, i)
       saveAttentionMatrix(attention[-1], save_dir, i, english_labels_valid.split(), french_labels_valid.split())
-      
+
+      #repeated_batch = dh.getValidateBatch(1)
+      predictions, attention = nmt.predict(repeated_batch[0])
+      #print("shape of predictions: ", predictions.shape)
+      saveTranslation(repeated_batch[0], repeated_batch[1], predictions, save_dir, i, "_repeated", dh)
+      english_labels_valid = dh.oneHotsToWords(repeated_batch[0][-1], dh.dict_token_to_word_langs[0])
+      french_labels_valid = dh.softmaxesToWords(predictions[-1], dh.dict_token_to_word_langs[1], no_unk=False)
+      #saveAttention(attention[-1], save_dir, i)
+      saveAttentionMatrix(attention[-1], save_dir, i, english_labels_valid.split(), french_labels_valid.split(), suffix="_repeated")
+
       current_time = time.time()
       hours, rem = divmod(current_time - start_time, 3600)
       minutes, seconds = divmod(rem, 60)
