@@ -92,6 +92,15 @@ def main(argv):
     type        = float,
     help        = "The dropout keep probability to use in recurrent layers of the network during training.")
 
+
+  parser.add_argument("-tr", "--truncatelines",
+    required    = False,
+    default     = False,
+    action      = 'store_true',
+    help        = "When this flag is set, any training batch with a sequence length greater than the max line \
+                   length will be truncated. If this flag is not set, new batches are retrieved until one is found \
+                   that matches the max sequence length.")
+
   args = parser.parse_args()
 
   dh = DataHandler(args.englishtext, args.englishdict, args.targettext, args.targetdict, output_has_start_token=args.starttokenonoutput, input_has_start_token=args.starttokenoninput)
@@ -123,15 +132,24 @@ def main(argv):
     if prev_epoch_count < curr_epoch_count:
       print("\n\n\n       new epoch!        \n\n\n", curr_epoch_count)
       prev_epoch_count = dh.num_epochs_elapsed
+
     new_batch = dh.getTrainBatch(args.batchsize)
-    while new_batch[0].shape[1] > args.maxlinelength:
-      #print("That batch was too big, getting another one.")
-      new_batch = dh.getTrainBatch(args.batchsize)
+    if args.truncatelines:
+      if new_batch[0].shape[1] > args.maxlinelength:
+        new_batch[0] = new_batch[0][:, 0:args.maxlinelength, :]
+        new_batch[1] = new_batch[1][:, 0:args.maxlinelength, :]
+    else:
+      while new_batch[0].shape[1] > args.maxlinelength:
+        #print("That batch was too big, getting another one.")
+        new_batch = dh.getTrainBatch(args.batchsize)
+
     loss, _ = nmt.trainStep(new_batch[0], new_batch[1], args.dropoutkeepprob, args.teacherforcing)
+
     if np.isnan(loss):
       print("Found a loss that is nan... exiting.")
       sys.exit(-1)
     loss_file.write(str(loss) + "\n")
+
     if (i % 50) == 0:
       predictions, attention = nmt.predict(new_batch[0])
       saveTranslation(new_batch[0], new_batch[1], predictions, save_dir, i, "_train", dh)
@@ -164,6 +182,7 @@ def main(argv):
       print("Elapsed time: {:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds))
       print("Num epochs: ", curr_epoch_count)
       print("Loss: ", loss)
+
     if (i % 500) == 0:
       nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
     i += 1

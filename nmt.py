@@ -48,8 +48,8 @@ class NMT(object):
         initializer=tf.initializers.random_normal(stddev=0.01))
 
       input_2d = tf.reshape(self.input_data_ph, [-1, in_vocab_size])
-      #embedded_input_2d = tf.nn.relu(tf.matmul(input_2d, self.W_in_embed) + self.bw_in_embed)
-      embedded_input_2d = tf.matmul(input_2d, self.W_in_embed)
+      embedded_input_2d = tf.nn.relu(tf.matmul(input_2d, self.W_in_embed) + self.bw_in_embed)
+      #embedded_input_2d = tf.matmul(input_2d, self.W_in_embed)
       embedded_input_3d = tf.reshape(embedded_input_2d, [batch_size, seq_length_enc, embedding_size])
 
       # Using GRUs because their outputs are the same as their hidden states,
@@ -62,10 +62,10 @@ class NMT(object):
         kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
       self.gru_encoder_fw_dropout = tf.nn.rnn_cell.DropoutWrapper(
         self.gru_encoder_fw,
-        output_keep_prob=1.0)
+        output_keep_prob=self.dropout_prob_ph)
       self.gru_encoder_bw_dropout = tf.nn.rnn_cell.DropoutWrapper(
         self.gru_encoder_bw,
-        output_keep_prob=1.0)
+        output_keep_prob=self.dropout_prob_ph)
 
       self.gru_encoder_out, self.gru_encoder_state = \
         tf.nn.bidirectional_dynamic_rnn(
