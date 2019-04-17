@@ -7,3 +7,8 @@ tokenized_data_orig/*
 .ipynb_checkpoints/*
 tokenized_data_fixed/*
 tokenized_data_europarl
+tokenized_data_europarl
+tokenized_data_europarl_nolow
+tokenized_data_manythings_europarl
+tokenized_data_manythings_europarl_nolow
+tokenized_giga_french

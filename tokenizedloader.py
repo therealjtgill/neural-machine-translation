@@ -11,7 +11,7 @@ import sys
 
 class DataHandler(object):
 
-  def __init__(self, file_language_1, dict_language_1, file_language_2, dict_language_2):
+  def __init__(self, file_language_1, dict_language_1, file_language_2, dict_language_2, output_has_start_token=True, input_has_start_token=True):
     '''
     The dictionaries map words to tokens in a 1:1 relationship.
     The language files are sentence-aligned between the two languages. There is
@@ -19,6 +19,8 @@ class DataHandler(object):
     '''
     self.file_langs = (file_language_1, file_language_2)
     self.dict_word_to_token_langs = [None, None]
+    self._output_has_start_token = output_has_start_token
+    self._input_has_start_token = input_has_start_token
 
     with open(dict_language_1, "r") as d1:
       self.dict_word_to_token_langs[0] = json.load(d1)
@@ -40,13 +42,21 @@ class DataHandler(object):
 
     self.file_lang_lengths = [{}, {}]
 
-    train_file_1     = self.file_langs[0] + "_train_50"
-    test_file_1      = self.file_langs[0] + "_test_50"
-    validate_file_1  = self.file_langs[0] + "_validate_50"
+#    train_file_1     = self.file_langs[0] + "_train_50" # Remove the "_50" suffix from the data splits
+#    test_file_1      = self.file_langs[0] + "_test_50"
+#    validate_file_1  = self.file_langs[0] + "_validate_50"
 
-    train_file_2     = self.file_langs[1] + "_train_50"
-    test_file_2      = self.file_langs[1] + "_test_50"
-    validate_file_2  = self.file_langs[1] + "_validate_50"
+#    train_file_2     = self.file_langs[1] + "_train_50"
+#    test_file_2      = self.file_langs[1] + "_test_50"
+#    validate_file_2  = self.file_langs[1] + "_validate_50"
+
+    train_file_1     = self.file_langs[0] + "_train"
+    test_file_1      = self.file_langs[0] + "_test"
+    validate_file_1  = self.file_langs[0] + "_validate"
+
+    train_file_2     = self.file_langs[1] + "_train"
+    test_file_2      = self.file_langs[1] + "_test"
+    validate_file_2  = self.file_langs[1] + "_validate"
 
     self.train_files = (train_file_1, train_file_2)
     self.test_files  = (test_file_1, test_file_2)
@@ -150,20 +160,12 @@ class DataHandler(object):
         for i, line in enumerate(f1):
           if line.strip() == "":
             ignore_lines.append(i)
-          if (n == 0) and len(line) > 51:
-            ignore_lines.append(i)
+#          if (n == 0) and len(line) > 51: # Delete the check for line length being greater than fifty
+#            ignore_lines.append(i)
     ignore_lines = list(set(ignore_lines))
 
     print("Ignoring ", len(ignore_lines), " lines of text.")
 
-#    for i, ignore_index in enumerate(ignore_lines):
-#      if ignore_index in train_indices:
-#        train_indices.pop(train_indices.index(ignore_index))
-#      if ignore_index in test_indices:
-#        test_indices.pop(test_indices.index(ignore_index))
-#      if ignore_index in validate_indices:
-#        validate_indices.pop(validate_indices.index(ignore_index))
-#      print("line", i, "out of", len(ignore_lines), "          \r", end="")
     print("len train indices: ", len(train_indices))
     train_indices_ = sorted(list(set(train_indices) - set(ignore_lines)))
     test_indices_ = sorted(list(set(test_indices) - set(ignore_lines)))
@@ -182,14 +184,12 @@ class DataHandler(object):
             for i, line in enumerate(f1):
               if len(train_indices) == 0:
                 break
-              #if i in train_indices and i not in ignore_lines:
-              #if i in train_indices:
               if i == train_indices[0]:
                 trl1.write(line)
                 train_indices.pop(0)
               print("line", i, "out of train set          \r", end="")
         else:
-          #if n == 0:
+          print("file ", self.train_files[n], " exists")
           _, self.train_files_size = self.getSentenceLengths(self.train_files[n])
           print(self.train_files_size)
         print()
@@ -201,8 +201,6 @@ class DataHandler(object):
             for j, line in enumerate(f1):
               if len(test_indices) == 0:
                 break
-              #if j in test_indices and j not in ignore_lines:
-              #if j in test_indices:
               if j == test_indices[0]:
                 tel1.write(line)
                 test_indices.pop(0)
@@ -220,8 +218,6 @@ class DataHandler(object):
             for k, line in enumerate(f1):
               if len(validate_indices) == 0:
                 break
-              #if k in validate_indices and k not in ignore_lines:
-              #if k in validate_indices:
               if k == validate_indices[0]:
                 val1.write(line)
                 validate_indices.pop(0)
@@ -244,7 +240,6 @@ class DataHandler(object):
     '''
     words = []
     for token in tokens:
-      #print(token)
       if no_unk:
         if dictionary[token] != "<unk>":
           words.append(dictionary[token])
@@ -252,6 +247,17 @@ class DataHandler(object):
         words.append(dictionary[token])
 
     return " ".join(words)
+
+  def oneHotsToTokens(self, one_hots):
+    '''
+    Expects a matrix, or a vector of one-hot vectors.
+    '''
+
+    tokens = []
+    for i in range(len(one_hots)):
+      tokens.append(one_hots[i].argmax() + 1)
+
+    return tokens
 
   def oneHotsToWords(self, one_hots, dictionary, no_unk=True):
     '''
@@ -266,7 +272,7 @@ class DataHandler(object):
         continue
       token = np.squeeze(oh.argmax()) + 1
       tokens.append(int(token))
-    return self.tokensToWords(tokens, dictionary)
+    return self.tokensToWords(tokens, dictionary, no_unk)
 
   def softmaxesToWords(self, softmaxes, dictionary, no_unk=True):
     '''
@@ -309,7 +315,7 @@ class DataHandler(object):
   def getValidateBatch(self, batch_size):
     return self.getBatch(batch_size, source="validate")
 
-  def rawTextToOneHots(self, lines, vocab, seq_length=None):
+  def rawTextToOneHots(self, lines, vocab, seq_length=None, use_start=True):
     '''
     Expects lines to be an array of strings, with token characters delimited by
     spaces. So lines[i].split(" ") provides token numbers of the words in the
@@ -317,24 +323,32 @@ class DataHandler(object):
     Expects vocab to be a dictionary of words to token numbers. It also expects
     that the <end> tag is the last token in the dictionary (numerically).
     '''
+
     max_line_length = 0
     if seq_length == None:
-      max_line_length = max([len(l.split(" ")) for l in lines]) + 1
+      max_line_length = max([len(l.split(" ")) for l in lines]) + 2
     else:
-      max_line_length = seq_length
+      max_line_length = seq_length + 2
     batch_size = len(lines)
     vocab_size = len(vocab)
     one_hots = np.zeros((batch_size, max_line_length, vocab_size))
-    one_hots[:, :, vocab_size - 1] = 1.0
+    #one_hots[:, 1:, vocab_size - 2] = 1.0 # Janky way to end-pad with "<end>" vector
+    token_position_shift = 0
+    if use_start:
+      one_hots[:, 0, vocab_size - 1] = 1.0 # Janky way to front-pad with "<start>" vectors
+      token_position_shift = 1
 
     for bs in range(batch_size):
       line_tokens = lines[bs].strip().split(" ")
       #print("line tokens: ", lines[bs], line_tokens)
       for sl in range(len(line_tokens)):
         hot_index = int(line_tokens[sl]) - 1 # Tokens are 1-indexed
-        one_hots[bs, sl, vocab_size - 1] = 0.0
-        one_hots[bs, sl, hot_index] = 1.0
-      #one_hots[bs, len(line_tokens), vocab_size - 1] = 1.0
+        #one_hots[bs, sl + token_position_shift, vocab_size - 2] = 0.0
+        one_hots[bs, sl + token_position_shift, hot_index] = 1.0
+      if use_start:
+        one_hots[bs, len(line_tokens) + 1, vocab_size - 2] = 1.0
+      else:
+        one_hots[bs, len(line_tokens), vocab_size - 2] = 1.0
 
     return one_hots
 
@@ -382,13 +396,13 @@ class DataHandler(object):
           with open(self.train_files[i]) as traf:
             for j, line in enumerate(traf):
               if len(self.preloaded_train_data[i]) == num_sequences:
-                print("preloaded training data ", i, " has ", len(self.preloaded_train_data[i]), "things in it")
+                #print("preloaded training data ", i, " has ", len(self.preloaded_train_data[i]), "things in it")
                 break
               if j == preloaded_indices[num_lines_loaded] and (len(line.split(" ")) > 0):
                 print("indices remaining: ", num_sequences - len(self.preloaded_train_data[i]), "          \r", end="")
                 self.preloaded_train_data[i].append(line)
                 num_lines_loaded += 1
-          print("Finished loading batch indices from file ", self.train_files[i])
+          #print("Finished loading batch indices from file ", self.train_files[i])
 
         batch_lines[0] = self.preloaded_train_data[0][0:batch_size]
         batch_lines[1] = self.preloaded_train_data[1][0:batch_size]
@@ -429,13 +443,13 @@ class DataHandler(object):
           with open(self.test_files[i]) as traf:
             for j, line in enumerate(traf):
               if len(self.preloaded_test_data[i]) == num_sequences:
-                print("preloaded testing data ", i, " has ", len(self.preloaded_test_data[i]), "things in it")
+                #print("preloaded testing data ", i, " has ", len(self.preloaded_test_data[i]), "things in it")
                 break
               if j == preloaded_indices[num_lines_loaded] and (len(line.split(" ")) > 0):
                 print("indices remaining: ", num_sequences - len(self.preloaded_test_data[i]), "          \r", end="")
                 self.preloaded_test_data[i].append(line)
                 num_lines_loaded += 1
-          print("Finished loading batch indices from file ", self.test_files[i])
+          #print("Finished loading batch indices from file ", self.test_files[i])
 
         batch_lines[0] = self.preloaded_test_data[0][0:batch_size]
         batch_lines[1] = self.preloaded_test_data[1][0:batch_size]
@@ -476,13 +490,13 @@ class DataHandler(object):
           with open(self.validate_files[i]) as traf:
             for j, line in enumerate(traf):
               if len(self.preloaded_validate_data[i]) == num_sequences:
-                print("preloaded validating data ", i, " has ", len(self.preloaded_validate_data[i]), "things in it")
+                #print("preloaded validating data ", i, " has ", len(self.preloaded_validate_data[i]), "things in it")
                 break
               if j == preloaded_indices[num_lines_loaded] and (len(line.split(" ")) > 0):
                 print("indices remaining: ", num_sequences - len(self.preloaded_validate_data[i]), "          \r", end="")
                 self.preloaded_validate_data[i].append(line)
                 num_lines_loaded += 1
-          print("Finished loading batch indices from file ", self.validate_files[i])
+          #print("Finished loading batch indices from file ", self.validate_files[i])
 
         batch_lines[0] = self.preloaded_validate_data[0][0:batch_size]
         batch_lines[1] = self.preloaded_validate_data[1][0:batch_size]
@@ -492,16 +506,21 @@ class DataHandler(object):
     max_line_lengths = []
     max_line_lengths.append(max([len(l.split(" ")) for l in batch_lines[0]]) + 1)
     max_line_lengths.append(max([len(l.split(" ")) for l in batch_lines[1]]) + 1)
-    # TODO: sort the elements of batch_lines by english-sentence length.
+
     batch_lengths = [(i, len(l.split(" "))) for i, l in enumerate(batch_lines[0])]
     length_sorted_batch_indices = sorted(batch_lengths, key=(lambda s: s[1]))
     #print("length sorted batch indices: ", length_sorted_batch_indices)
     batch_lines_sorted = [None, None]
     for i in range(len(batch_lines)):
       batch_lines_sorted[i] = [batch_lines[i][j[0]] for j in length_sorted_batch_indices]
-    #for i, bstring in enumerate(batch_lines):
+
     for i, bstring in enumerate(batch_lines_sorted):
-      batch[i] = self.rawTextToOneHots(bstring, self.dict_word_to_token_langs[i], max(max_line_lengths))
+      use_start = True
+      if i == 0:
+        use_start = self._input_has_start_token
+      if i == 1:
+        use_start = self._output_has_start_token
+      batch[i] = self.rawTextToOneHots(bstring, self.dict_word_to_token_langs[i], max(max_line_lengths), use_start)
     return batch
 
 def main(argv):
@@ -553,7 +572,7 @@ def main(argv):
     print("Couldn't find dictionary file: ", args.dict2)
     sys.exit(-1)
 
-  dh = DataHandler(args.language1, args.dict1, args.language2, args.dict2)
+  dh = DataHandler(args.language1, args.dict1, args.language2, args.dict2, False, False)
   draw_times = []
   start_time = 0
   end_time = 0
@@ -564,11 +583,16 @@ def main(argv):
     batch2 = dh.getTestBatch(64)
     print(batch1[0].shape, batch1[1].shape)
     print()
-    print(dh.oneHotsToWords(batch1[0][0], dh.dict_token_to_word_langs[0]))
-    print(dh.oneHotsToWords(batch1[1][0], dh.dict_token_to_word_langs[1]))
+    print(dh.oneHotsToWords(batch1[0][0], dh.dict_token_to_word_langs[0], no_unk=False))
+    print(dh.oneHotsToTokens(batch1[0][0]))
+    print(dh.oneHotsToWords(batch1[1][0], dh.dict_token_to_word_langs[1], no_unk=False))
+    print(dh.oneHotsToTokens(batch1[1][0]))
     print()
-    print(dh.oneHotsToWords(batch2[0][0], dh.dict_token_to_word_langs[0]))
-    print(dh.oneHotsToWords(batch2[1][0], dh.dict_token_to_word_langs[1]))
+    print(dh.oneHotsToWords(batch2[0][0], dh.dict_token_to_word_langs[0], no_unk=False))
+    print(dh.oneHotsToTokens(batch2[0][0]))
+    print(dh.oneHotsToWords(batch2[1][0], dh.dict_token_to_word_langs[1], no_unk=False))
+    print(dh.oneHotsToTokens(batch2[1][0]))
+    print("\nend loop\n")
     diff = end_time - start_time
     draw_times.append(diff.seconds)
     print("That batch took ", diff.seconds, " seconds to be drawn.")

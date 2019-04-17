@@ -29,7 +29,7 @@ def tokensToWords(tokens, dictionary, no_unk=True):
     else:
       words.append(dictionary[token])
 
-  return " ".join(words)
+  return words
 
 def oneHotsToWords(one_hots, dictionary, no_unk=True):
   '''

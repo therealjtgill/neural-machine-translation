@@ -2,8 +2,11 @@ import argparse
 import nmt
 from nmt import NMT
 import numpy as np
+np.set_printoptions(threshold=np.nan)
+import os
 import tensorflow as tf
 from tokenconverter import *
+from utils import *
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Opens up the saved weights for \
@@ -28,9 +31,17 @@ if __name__ == "__main__":
     required    = True,
     default     = None,
     help        = "The string that will be translated into the target language.")
+
+  parser.add_argument("--usecpu",
+    required    = False,
+    default     = False,
+    action      = 'store_true',
+    help        = "Boolean flag indicating that the computation graph should be executed on the CPU.")
   
   args = parser.parse_args()
-  sess = tf.Session()
+  if args.usecpu:
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+  sess = sess = tf.Session()
   sess.run(tf.global_variables_initializer())
   # load JSON from dictionary...
   d1 = open(args.englishdict)
@@ -48,17 +59,29 @@ if __name__ == "__main__":
   nmt = NMT(sess, in_vocab_size=eng_vocab_size, out_vocab_size=tar_vocab_size, train=False)
   nmt.loadParams(args.loadconfig)
 
-  input_str = args.stringtotranslate.strip().replace(".", "")
+  input_str = args.stringtotranslate.strip()
   input_tokens = [eng_words_to_tokens[w] if w in eng_words_to_tokens else eng_words_to_tokens["<unk>"]
                   for w in input_str.split(" ")]
   print(input_tokens)
   input_one_hots = tokensToOneHots(input_tokens, eng_vocab_size)
-  print(input_one_hots)
+  print("input one hots shape: ", input_one_hots.shape)
+  input_hots = [a.argmax() for a in input_one_hots]
+  print("hot indices: ", input_hots)
   
   # Actually run the input tokens through the network and get the translation...
 
+  print("string to translate: ", args.stringtotranslate)
   predictions = nmt.predict([input_one_hots])
   print("shape of predictions", predictions[0].shape)
-  print(softmaxesToWords(predictions[0][0], tar_tokens_to_words, no_unk=False))
-
-  print(topKPredictions(predictions[0][0], 5, tar_tokens_to_words))
+  predicted_words = softmaxesToWords(predictions[0][0], tar_tokens_to_words, no_unk=False)
+  print(" ".join(predicted_words))
+  greedy_hot_indices, greedy_attention = nmt.greedySearch([input_one_hots])
+  print("greedy search output: ", greedy_hot_indices)
+  greedy_tokens = [i + 1 for i in greedy_hot_indices]
+  greedy_words = tokensToWords(greedy_tokens, tar_tokens_to_words)
+  print("greedy translation: ", greedy_words)
+  
+  for topk in topKPredictions(predictions[0][0], 5, tar_tokens_to_words):
+    print(topk)
+  plotAttentionMatrix(predictions[1][0], ".", input_str.split(), predicted_words)
+  plotAttentionMatrix(greedy_attention, ".", input_str.split(), greedy_words)
