@@ -84,10 +84,13 @@ def main(args):
       for i, line in enumerate(inputLines):
         tokenizedLine = word_tokenize(line)
         for token in tokenizedLine:
-          if token.lower() in wordFreqs:
-            wordFreqs[token.lower()] += 1
+          #if token.lower() in wordFreqs:
+          if token in wordFreqs:
+            #wordFreqs[token.lower()] += 1
+            wordFreqs[token] += 1
           else:
-            wordFreqs[token.lower()] = 1
+            #wordFreqs[token.lower()] = 1
+            wordFreqs[token] = 1
         
     #print("Opened the text file.")
     #allWords = " ".join(tokenizedLines)
@@ -112,7 +115,8 @@ def main(args):
     with open(os.path.join(args.output, "tokenized." + args.language), "w") as outFile:
       for line in inputLines:
         lineTokens = word_tokenize(line, args.language)
-        lineTokens = [t.lower() for t in lineTokens]
+        #lineTokens = [t.lower() for t in lineTokens]
+        lineTokens = [t for t in lineTokens]
         tokenizedLine = [str(topKTokens[t]) if t in topKTokens else str(int(args.topk) + 1) for t in lineTokens]
         tokenizedLine = " ".join(tokenizedLine)
         outFile.write(tokenizedLine + "\n")
@@ -121,7 +125,7 @@ def main(args):
 
   topKTokens["<unk>"] = int(args.topk + 1)
   topKTokens["<end>"] = int(args.topk + 2)
-  topKTokens["<start"]= int(args.topk + 3)
+  topKTokens["<start>"]= int(args.topk + 3)
   wordIndexDict = open(os.path.join(args.output, "dictionary." + args.language), "w")
   topKTokensJson = json.dump(topKTokens, wordIndexDict)
   wordIndexDict.close()
