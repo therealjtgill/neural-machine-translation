@@ -130,8 +130,10 @@ def main(argv):
   while (dh.num_epochs_elapsed < args.numepochs):
     curr_epoch_count = dh.num_epochs_elapsed
     if prev_epoch_count < curr_epoch_count:
-      print("\n\n\n       new epoch!        \n\n\n", curr_epoch_count)
+      print("\n\n\n       new epoch!        ", curr_epoch_count)
+      print("       saving the model        \n\n\n", curr_epoch_count)
       prev_epoch_count = dh.num_epochs_elapsed
+      nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
 
     new_batch = dh.getTrainBatch(args.batchsize)
     if args.truncatelines:
@@ -183,8 +185,8 @@ def main(argv):
       print("Num epochs: ", curr_epoch_count)
       print("Loss: ", loss)
 
-    if (i % 500) == 0:
-      nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
+#    if (i % 500) == 0:
+#      nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
     i += 1
   nmt.saveParams(os.path.join(save_dir, "nmt_checkpoint"), i)
   loss_file.close()

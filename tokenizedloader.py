@@ -42,13 +42,21 @@ class DataHandler(object):
 
     self.file_lang_lengths = [{}, {}]
 
-    train_file_1     = self.file_langs[0] + "_train_50"
-    test_file_1      = self.file_langs[0] + "_test_50"
-    validate_file_1  = self.file_langs[0] + "_validate_50"
+#    train_file_1     = self.file_langs[0] + "_train_50" # Remove the "_50" suffix from the data splits
+#    test_file_1      = self.file_langs[0] + "_test_50"
+#    validate_file_1  = self.file_langs[0] + "_validate_50"
 
-    train_file_2     = self.file_langs[1] + "_train_50"
-    test_file_2      = self.file_langs[1] + "_test_50"
-    validate_file_2  = self.file_langs[1] + "_validate_50"
+#    train_file_2     = self.file_langs[1] + "_train_50"
+#    test_file_2      = self.file_langs[1] + "_test_50"
+#    validate_file_2  = self.file_langs[1] + "_validate_50"
+
+    train_file_1     = self.file_langs[0] + "_train"
+    test_file_1      = self.file_langs[0] + "_test"
+    validate_file_1  = self.file_langs[0] + "_validate"
+
+    train_file_2     = self.file_langs[1] + "_train"
+    test_file_2      = self.file_langs[1] + "_test"
+    validate_file_2  = self.file_langs[1] + "_validate"
 
     self.train_files = (train_file_1, train_file_2)
     self.test_files  = (test_file_1, test_file_2)
@@ -152,8 +160,8 @@ class DataHandler(object):
         for i, line in enumerate(f1):
           if line.strip() == "":
             ignore_lines.append(i)
-          if (n == 0) and len(line) > 51:
-            ignore_lines.append(i)
+#          if (n == 0) and len(line) > 51: # Delete the check for line length being greater than fifty
+#            ignore_lines.append(i)
     ignore_lines = list(set(ignore_lines))
 
     print("Ignoring ", len(ignore_lines), " lines of text.")
@@ -176,13 +184,12 @@ class DataHandler(object):
             for i, line in enumerate(f1):
               if len(train_indices) == 0:
                 break
-              #if i in train_indices and i not in ignore_lines:
-              #if i in train_indices:
               if i == train_indices[0]:
                 trl1.write(line)
                 train_indices.pop(0)
               print("line", i, "out of train set          \r", end="")
         else:
+          print("file ", self.train_files[n], " exists")
           _, self.train_files_size = self.getSentenceLengths(self.train_files[n])
           print(self.train_files_size)
         print()
