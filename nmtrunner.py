@@ -2,7 +2,8 @@ import argparse
 import nmt
 from nmt import NMT
 import numpy as np
-np.set_printoptions(threshold=np.nan)
+import sys
+np.set_printoptions(threshold=sys.maxsize)
 import os
 import tensorflow as tf
 from tokenconverter import *
@@ -79,9 +80,11 @@ if __name__ == "__main__":
   print("greedy search output: ", greedy_hot_indices)
   greedy_tokens = [i + 1 for i in greedy_hot_indices]
   greedy_words = tokensToWords(greedy_tokens, tar_tokens_to_words)
-  print("greedy translation: ", greedy_words)
+  greedy_string = " ".join(greedy_words)
+  print("len greedy words: ", len(greedy_words))
+  print("greedy translation: ", greedy_string)
   
-  for topk in topKPredictions(predictions[0][0], 5, tar_tokens_to_words):
-    print(topk)
+#  for topk in topKPredictions(predictions[0][0], 5, tar_tokens_to_words):
+#    print(topk)
   plotAttentionMatrix(predictions[1][0], ".", input_str.split(), predicted_words)
   plotAttentionMatrix(greedy_attention, ".", input_str.split(), greedy_words)

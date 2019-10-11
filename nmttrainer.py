@@ -150,7 +150,7 @@ def main(argv):
     if np.isnan(loss):
       print("Found a loss that is nan... exiting.")
       sys.exit(-1)
-    loss_file.write(str(loss) + "\n")
+    loss_file.write(str(loss) + "," + str(new_batch[0].shape[1]) + "\n")
 
     if (i % 50) == 0:
       predictions, attention = nmt.predict(new_batch[0])
