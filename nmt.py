@@ -23,10 +23,26 @@ class NMT(object):
 
     with tf.variable_scope("nmt", reuse=False):
       self.saver = None
-      self.input_data_ph   = tf.placeholder(dtype=tf.float32, shape=[None, None, in_vocab_size], name="inputdata")
-      self.output_data_ph  = tf.placeholder(dtype=tf.float32, shape=[None, None, out_vocab_size], name="outputdata")
-      self.dropout_prob_ph = tf.placeholder(dtype=tf.float32, shape=[], name="dropoutprob")
-      self.teacher_forcing_ph = tf.placeholder(dtype=tf.bool, shape=[], name="teacherforce")
+      self.input_data_ph = tf.placeholder(
+        dtype=tf.float32,
+        shape=[None, None, in_vocab_size],
+        name="inputdata"
+      )
+      self.output_data_ph  = tf.placeholder(
+        dtype=tf.float32,
+        shape=[None, None, out_vocab_size],
+        name="outputdata"
+      )
+      self.dropout_prob_ph = tf.placeholder(
+        dtype=tf.float32,
+        shape=[],
+        name="dropoutprob"
+      )
+      self.teacher_forcing_ph = tf.placeholder(
+        dtype=tf.bool,
+        shape=[],
+        name="teacherforce"
+      )
 
       self.session = session
 
@@ -36,7 +52,10 @@ class NMT(object):
       seq_length_dec = tf.cast(tf.shape(self.output_data_ph)[1], tf.int32)
 
       # Placeholders for forward and backward states of decoder bidirectional GRU.
-      decoder_h_ph = tf.placeholder(dtype=tf.float32, shape=[None, num_encoder_nodes])
+      decoder_h_ph = tf.placeholder(
+        dtype=tf.float32,
+        shape=[None, num_encoder_nodes]
+      )
 
       self.W_in_embed  = tf.get_variable(
         "W_in_embed",
@@ -48,18 +67,31 @@ class NMT(object):
         initializer=tf.initializers.random_normal(stddev=0.01))
 
       input_2d = tf.reshape(self.input_data_ph, [-1, in_vocab_size])
-      embedded_input_2d = tf.nn.relu(tf.matmul(input_2d, self.W_in_embed) + self.bw_in_embed)
+      embedded_input_2d = tf.nn.relu(
+        tf.matmul(input_2d, self.W_in_embed) + self.bw_in_embed
+      )
       #embedded_input_2d = tf.matmul(input_2d, self.W_in_embed)
-      embedded_input_3d = tf.reshape(embedded_input_2d, [batch_size, seq_length_enc, embedding_size])
+      embedded_input_3d = tf.reshape(
+        embedded_input_2d,
+        [batch_size, seq_length_enc, embedding_size]
+      )
 
       # Using GRUs because their outputs are the same as their hidden states,
       # which makes grabbing all unrolled hidden states possible.
       self.gru_encoder_fw = tf.nn.rnn_cell.GRUCell(
         num_encoder_nodes,
-        kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
+        kernel_initializer=tf.initializers.orthogonal(
+          gain=1.0,
+          dtype=tf.float32
+        )
+      )
       self.gru_encoder_bw = tf.nn.rnn_cell.GRUCell(
         num_encoder_nodes,
-        kernel_initializer=tf.initializers.orthogonal(gain=1.0, dtype=tf.float32))
+        kernel_initializer=tf.initializers.orthogonal(
+          gain=1.0,
+          dtype=tf.float32
+        )
+      )
       self.gru_encoder_fw_dropout = tf.nn.rnn_cell.DropoutWrapper(
         self.gru_encoder_fw,
         output_keep_prob=self.dropout_prob_ph)
@@ -123,16 +155,28 @@ class NMT(object):
       self.predictions = tf.nn.softmax(predicted_logits, axis=-1)
       self.attention   = self.gru_decoder_out[1]
 
-      cross_entropy_2d = tf.nn.softmax_cross_entropy_with_logits_v2(labels=target_probs_flat, logits=predicted_logits_flat)
-      cross_entropy_3d = tf.reshape(cross_entropy_2d, shape=[batch_size, seq_length_dec, -1])
+      cross_entropy_2d = tf.nn.softmax_cross_entropy_with_logits_v2(
+        labels=target_probs_flat,
+        logits=predicted_logits_flat
+      )
+      cross_entropy_3d = tf.reshape(
+        cross_entropy_2d,
+        shape=[batch_size, seq_length_dec, -1]
+      )
       print("cross entropy: ", cross_entropy_3d)
       self.loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_3d, axis=1))
       print("self loss: ", self.loss)
 
       if train:
-        optimizer = tf.train.AdadeltaOptimizer(learning_rate=1.0, epsilon=1e-06)
+        optimizer = tf.train.AdadeltaOptimizer(
+          learning_rate=1.0,
+          epsilon=1e-6
+        )
         grads_and_vars = optimizer.compute_gradients(self.loss)
-        capped_grads = [(grad if grad is None else tf.clip_by_norm(grad, 1.0), var) for grad, var in grads_and_vars]
+        capped_grads = [
+          (grad if grad is None else tf.clip_by_norm(grad, 1.0), var)
+          for grad, var in grads_and_vars
+        ]
         self.train_op = optimizer.apply_gradients(capped_grads)
 
       if save:
@@ -140,12 +184,24 @@ class NMT(object):
 
     with tf.variable_scope("nmt", reuse=True):
       print(self.gru_dec_dropout.state_size)
-      # The last element of the decoder's state is not used by the decoder, it's just for making pretty attention plots.
-      self.decoder_gru_input_ph            = tf.placeholder(dtype=tf.float32, shape=(1, self.gru_dec_dropout.state_size[0]))
-      self.decoder_prev_softmaxes_input_ph = tf.placeholder(dtype=tf.float32, shape=(1, self.gru_dec_dropout.state_size[1]))
-      self.encoder_output_ph               = tf.placeholder(dtype=tf.float32, shape=[1, None, 2*num_encoder_nodes])
+      # The last element of the decoder's state is not used by the decoder,
+      # it's just for making pretty attention plots.
+      self.decoder_gru_input_ph = tf.placeholder(
+        dtype=tf.float32,
+        shape=(1, self.gru_dec_dropout.state_size[0])
+      )
+      self.decoder_prev_softmaxes_input_ph = tf.placeholder(
+        dtype=tf.float32,
+        shape=(1, self.gru_dec_dropout.state_size[1])
+      )
+      self.encoder_output_ph = tf.placeholder(
+        dtype=tf.float32,
+        shape=[1, None, 2*num_encoder_nodes]
+      )
 
-      fake_decoder_inputs = tf.zeros([1, 1, self.gru_dec_dropout.state_size[1]])
+      fake_decoder_inputs = tf.zeros(
+        [1, 1, self.gru_dec_dropout.state_size[1]]
+      )
 
       self.gru_decoder_test = DecoderCell(
         num_encoder_nodes*2,
@@ -154,7 +210,9 @@ class NMT(object):
         teacher_forcing=self.teacher_forcing_ph,
         output_vocab_size=out_vocab_size)
 
-      decoder_input_state    = list(self.gru_decoder_test.zero_state(1, dtype=tf.float32))
+      decoder_input_state    = list(
+        self.gru_decoder_test.zero_state(1, dtype=tf.float32)
+      )
       decoder_input_state[0] = self.decoder_gru_input_ph
       decoder_input_state[1] = self.decoder_prev_softmaxes_input_ph
       decoder_input_state    = tuple(decoder_input_state)
@@ -289,7 +347,8 @@ class NMT(object):
     #print(prev_word.shape)
     #print(encoder_output[0].shape)
 
-    decoder_out, decoder_state, prediction, attention = self.session.run(fetches, feeds)
+    decoder_out, decoder_state, prediction, attention = \
+      self.session.run(fetches, feeds)
     #print("prediction shape: ", prediction.shape)
     return decoder_out, decoder_state, prediction, attention
 
@@ -318,12 +377,14 @@ class NMT(object):
     top_k_items = [(w, p) for w, p in zip(top_k_indices, top_k_probs)]
     return top_k_items
 
-  def softmaxToOnehot(self, softmax):
+  def softmaxToOnehot(self, softmax, no_unk=True):
     '''
     shape(softmax) = [1, 1, vocab_size]
     '''
 
     one_hot = np.zeros_like(softmax)
+    if no_unk:
+      pass
     no_unk_softmax = softmax
     no_unk_softmax[0, 0, 30000] = 0.0
     #hot_index = no_unk_softmax[0, 0].argmax()
